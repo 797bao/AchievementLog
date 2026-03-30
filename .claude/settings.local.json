@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c \":*)",
+      "Bash(python -c \":*)",
+      "Bash(node -e \":*)",
+      "Bash(npx create-react-app:*)",
+      "Bash(npm install:*)",
+      "Bash(node src/seedAchievements.js)",
+      "Bash(npm start:*)",
+      "Bash(cp \"C:/Users/797ng/AndroidStudioProjects/MyStats/app/build/intermediates/packaged_res/debug/packageDebugResources/drawable-nodpi-v4/strength.png\" \"C:/Users/797ng/Documents/GitHub/AchievementLog/public/\")",
+      "Bash(cp \"C:/Users/797ng/AndroidStudioProjects/MyStats/app/build/intermediates/packaged_res/debug/packageDebugResources/drawable-nodpi-v4/agility.png\" \"C:/Users/797ng/Documents/GitHub/AchievementLog/public/\")",
+      "Bash(cp \"C:/Users/797ng/AndroidStudioProjects/MyStats/app/build/intermediates/packaged_res/debug/packageDebugResources/drawable-nodpi-v4/mage.png\" \"C:/Users/797ng/Documents/GitHub/AchievementLog/public/\")",
+      "Bash(cp \"C:/Users/797ng/AndroidStudioProjects/MyStats/app/build/intermediates/packaged_res/debug/packageDebugResources/drawable-nodpi-v4/redhat.png\" \"C:/Users/797ng/Documents/GitHub/AchievementLog/public/\")",
+      "Bash(ls C:Users797ngDocumentsGitHubAchievementLogpublic*.png)",
+      "Bash(ls /c/Users/797ng/Documents/GitHub/AchievementLog/public/*.png)",
+      "Bash(dir \"C:\\\\Users\\\\797ng\\\\Documents\\\\GitHub\\\\AchievementLog\\\\public\\\\*.png\")",
+      "Bash(npx react-scripts:*)",
+      "Bash(gh auth:*)",
+      "Bash(git config:*)",
+      "Bash(find /c/Users/797ng/Documents/GitHub/workout-tracker -type f -name firebase* -o -name .env* -o -name package.json -o -name .gitignore)"
+    ]
+  }
+}

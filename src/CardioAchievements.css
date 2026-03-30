@@ -1,0 +1,268 @@
+.cardio-achievements {
+  max-width: 700px;
+}
+
+/* ── Section Header ── */
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+
+.section-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: #e8eaed;
+  margin: 0;
+}
+
+.progress-badge {
+  font-size: 13px;
+  color: #9aa0a6;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 3px 10px;
+  border-radius: 12px;
+}
+
+.rm-dropdown {
+  margin-left: auto;
+  background: #2C2F38;
+  color: #e8eaed;
+  border: 1px solid #3c3f47;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  outline: none;
+}
+
+.rm-dropdown:hover {
+  border-color: #5f6368;
+}
+
+.rm-dropdown option {
+  background: #2C2F38;
+  color: #e8eaed;
+}
+
+/* ── Hide Completed Toggle ── */
+.hide-completed-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #9aa0a6;
+  cursor: pointer;
+  user-select: none;
+  margin-left: auto;
+}
+
+.hide-completed-toggle input[type="checkbox"] {
+  accent-color: #8ab4f8;
+  cursor: pointer;
+  width: 14px;
+  height: 14px;
+}
+
+/* ── Group ── */
+.achievement-group {
+  margin-bottom: 32px;
+}
+
+.group-label {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #9aa0a6;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #3c3f47;
+}
+
+/* ── List ── */
+.achievement-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* ── Item ── */
+.achievement-item {
+  border-radius: 6px;
+  transition: background 0.12s;
+}
+
+.achievement-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  cursor: default;
+  user-select: none;
+}
+
+.achievement-item.completed .achievement-row {
+  cursor: pointer;
+}
+
+.achievement-item.completed .achievement-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* ── Checkmark ── */
+.check {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid #5f6368;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+  color: transparent;
+  transition: all 0.15s;
+}
+
+.check.checked {
+  background: #34a853;
+  border-color: #34a853;
+  color: #fff;
+}
+
+/* ── Label ── */
+.achievement-label {
+  font-size: 15px;
+  color: #9aa0a6;
+  flex: 1;
+}
+
+.achievement-item.completed .achievement-label {
+  color: #e8eaed;
+}
+
+/* ── Count badge ── */
+.completion-count {
+  font-size: 12px;
+  color: #9aa0a6;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+/* ── Expanded dates ── */
+.completion-dates {
+  list-style: none;
+  padding: 4px 0 10px 50px;
+}
+
+.completion-date {
+  font-size: 13px;
+  color: #80868b;
+  padding: 3px 0;
+}
+
+/* ── Pin Button ── */
+.pin-btn {
+  background: none;
+  border: none;
+  color: #5f6368;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
+  opacity: 0;
+}
+
+.achievement-row:hover .pin-btn {
+  opacity: 1;
+}
+
+.pin-btn.pinned {
+  color: #fbbf24;
+  opacity: 1;
+}
+
+.pin-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fbbf24;
+}
+
+/* ── Inbox icon (leftmost) ── */
+.inbox-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+}
+
+/* ── Inbox labels ── */
+.inbox-category {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #80868b;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+.inbox-exercise {
+  display: inline-block;
+  font-size: 11px;
+  color: #9aa0a6;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+/* ── Nav badge (pin count) ── */
+.nav-badge {
+  font-size: 11px;
+  background: #fbbf24;
+  color: #202124;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 600;
+  margin-left: auto;
+}
+
+/* ── Streak details (Dev achievements) ── */
+.streak-header {
+  display: block;
+  font-weight: 600;
+  color: #9aa0a6;
+  margin-bottom: 2px;
+}
+
+.streak-month {
+  display: block;
+  padding-left: 12px;
+  color: #80868b;
+}
+
+/* ── States ── */
+.loading {
+  color: #9aa0a6;
+  padding: 40px;
+  text-align: center;
+}
+
+.empty-state {
+  color: #5f6368;
+  font-size: 14px;
+  padding: 20px 0;
+}
