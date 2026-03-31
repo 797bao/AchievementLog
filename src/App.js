@@ -44,7 +44,7 @@ const DEV_ITEMS = [
 function App() {
   const [user, setUser] = useState(null);
   const [authReady, setAuthReady] = useState(false);
-  const [activeSection, setActiveSection] = useState('cardio');
+  const [activeSection, setActiveSection] = useState('inbox');
   const [activeExercise, setActiveExercise] = useState(null);
   const [cardioFilter, setCardioFilter] = useState(null);
   const [devFilter, setDevFilter] = useState(null);
