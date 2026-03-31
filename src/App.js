@@ -6,6 +6,7 @@ import CardioAchievements from './CardioAchievements';
 import StrengthAchievements from './StrengthAchievements';
 import DevAchievements from './DevAchievements';
 import ArtAchievements from './ArtAchievements';
+import Quests from './Quests';
 import Inbox from './Inbox';
 import ShapeIcon from './ShapeIcon';
 import './App.css';
@@ -77,6 +78,7 @@ function App() {
   const [cardioData, setCardioData] = useState({});
   const [hourData, setHourData] = useState({});
   const [illustrationData, setIllustrationData] = useState({});
+  const [questData, setQuestData] = useState({});
 
   useEffect(() => {
     const unsubs = [
@@ -104,6 +106,9 @@ function App() {
       }),
       onValue(ref(database, 'illustrations'), (snap) => {
         setIllustrationData(snap.val() || {});
+      }),
+      onValue(ref(database, 'quests'), (snap) => {
+        setQuestData(snap.val() || {});
       }),
     ];
     return () => unsubs.forEach((u) => u());
@@ -245,6 +250,21 @@ function App() {
     return Object.keys(illustrationData).length;
   }, [illustrationData]);
 
+  // ── Quest counts (effective status: quest with subquests needs all subs completed) ──
+  const questCounts = useMemo(() => {
+    const all = Object.values(questData);
+    let completed = 0;
+    for (const q of all) {
+      const subs = q.subquests ? Object.values(q.subquests) : [];
+      if (subs.length === 0) {
+        if (q.status === 'completed') completed++;
+      } else {
+        if (subs.every((s) => s.status === 'completed')) completed++;
+      }
+    }
+    return { completed, total: all.length };
+  }, [questData]);
+
   // ── Section totals ──
   const strengthTotal = useMemo(() => {
     let completed = 0, total = 0;
@@ -265,9 +285,9 @@ function App() {
   }, [devCounts]);
 
   const grandTotal = useMemo(() => ({
-    completed: strengthTotal.completed + cardioTotal.completed + devTotal.completed,
-    total: strengthTotal.total + cardioTotal.total + devTotal.total,
-  }), [strengthTotal, cardioTotal, devTotal]);
+    completed: strengthTotal.completed + cardioTotal.completed + devTotal.completed + questCounts.completed,
+    total: strengthTotal.total + cardioTotal.total + devTotal.total + questCounts.total,
+  }), [strengthTotal, cardioTotal, devTotal, questCounts]);
 
   const pinCount = Object.keys(pins).length;
 
@@ -317,6 +337,11 @@ function App() {
 
   const handleArtItemClick = () => {
     setActiveSection('art');
+    clearFilters();
+  };
+
+  const handleQuestClick = () => {
+    setActiveSection('quests');
     clearFilters();
   };
 
@@ -461,6 +486,18 @@ function App() {
               </li>
             </ul>
           )}
+
+          {/* Quests — no subsections */}
+          <li
+            className={`nav-item ${activeSection === 'quests' ? 'active' : ''}`}
+            onClick={handleQuestClick}
+          >
+            <span className="nav-icon"><img src={`${process.env.PUBLIC_URL}/Quest.png`} alt="" className="nav-icon-img" /></span>
+            <span className="nav-label">Quests</span>
+            {questCounts.total > 0 && (
+              <span className="nav-count">{questCounts.completed}/{questCounts.total}</span>
+            )}
+          </li>
         </ul>
         <div className="sidebar-footer">
           {authReady && !user && (
@@ -516,6 +553,9 @@ function App() {
         </div>
         <div style={{ display: activeSection === 'art' ? 'block' : 'none' }}>
           <ArtAchievements isOwner={isOwner} />
+        </div>
+        <div style={{ display: activeSection === 'quests' ? 'block' : 'none' }}>
+          <Quests isOwner={isOwner} />
         </div>
         <div style={{ display: activeSection === 'inbox' ? 'block' : 'none' }}>
           <Inbox
