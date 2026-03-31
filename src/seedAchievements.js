@@ -70,11 +70,13 @@ const onePointFive = [
   '9:00', '8:45', '8:30', '8:15', '8:00',
 ];
 for (const time of onePointFive) {
+  const totalSec = toSeconds(time);
+  const paceLabel = formatPace(totalSec, 1.5);
   const id = `1_5mi_${time.replace(':', '')}`;
   cardioAchievements[id] = {
     distance: 1.5,
-    targetSeconds: toSeconds(time),
-    label: `${time} — 1.5 miles`,
+    targetSeconds: totalSec,
+    label: `${time} — 1.5 miles (${paceLabel})`,
     group: '1.5 mi',
     order: cOrder++,
   };

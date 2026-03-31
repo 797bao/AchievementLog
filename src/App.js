@@ -49,7 +49,7 @@ function App() {
   const [cardioFilter, setCardioFilter] = useState(null);
   const [devFilter, setDevFilter] = useState(null);
   const [strengthOpen, setStrengthOpen] = useState(false);
-  const [cardioOpen, setCardioOpen] = useState(true);
+  const [cardioOpen, setCardioOpen] = useState(false);
   const [devOpen, setDevOpen] = useState(false);
   const [artOpen, setArtOpen] = useState(false);
   const [pins, setPins] = useState({});
