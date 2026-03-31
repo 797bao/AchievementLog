@@ -54,6 +54,7 @@ function App() {
   const [artOpen, setArtOpen] = useState(false);
   const [pins, setPins] = useState({});
   const [hideCompleted, setHideCompleted] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // ── Auth ──
   useEffect(() => {
@@ -321,33 +322,39 @@ function App() {
     setActiveSection('strength');
     clearFilters();
     setActiveExercise(exId);
+    setSidebarOpen(false);
   };
 
   const handleCardioItemClick = (filterId) => {
     setActiveSection('cardio');
     clearFilters();
     setCardioFilter(filterId);
+    setSidebarOpen(false);
   };
 
   const handleDevItemClick = (sourceId) => {
     setActiveSection('dev');
     clearFilters();
     setDevFilter(sourceId);
+    setSidebarOpen(false);
   };
 
   const handleArtItemClick = () => {
     setActiveSection('art');
     clearFilters();
+    setSidebarOpen(false);
   };
 
   const handleQuestClick = () => {
     setActiveSection('quests');
     clearFilters();
+    setSidebarOpen(false);
   };
 
   const handleInboxClick = () => {
     setActiveSection('inbox');
     clearFilters();
+    setSidebarOpen(false);
   };
 
   // Keep all components mounted to preserve Firebase subscriptions & state.
@@ -355,7 +362,11 @@ function App() {
 
   return (
     <div className="app">
-      <nav className="sidebar">
+      <button className="hamburger" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+      {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
+      <nav className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
           <span>Achievement Log</span>
           {grandTotal.total > 0 && (

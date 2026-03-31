@@ -266,3 +266,37 @@
   font-size: 14px;
   padding: 20px 0;
 }
+
+/* ── Mobile tweaks ── */
+@media (max-width: 768px) {
+  .section-header {
+    gap: 8px;
+    margin-bottom: 18px;
+  }
+
+  .section-title {
+    font-size: 18px;
+  }
+
+  .achievement-row {
+    gap: 10px;
+    padding: 9px 10px;
+  }
+
+  .achievement-label {
+    font-size: 14px;
+  }
+
+  .completion-dates {
+    padding-left: 24px;
+  }
+
+  .pin-btn {
+    opacity: 1; /* always visible on touch — no hover */
+  }
+
+  .rm-dropdown {
+    margin-left: 0;
+    width: 100%;
+  }
+}

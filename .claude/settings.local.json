@@ -20,7 +20,8 @@
       "Bash(git config:*)",
       "Bash(find /c/Users/797ng/Documents/GitHub/workout-tracker -type f -name firebase* -o -name .env* -o -name package.json -o -name .gitignore)",
       "Bash(xargs wc:*)",
-      "Bash(copy \"C:\\\\Users\\\\797ng\\\\AndroidStudioProjects\\\\MyStats\\\\app\\\\build\\\\intermediates\\\\packaged_res\\\\debug\\\\packageDebugResources\\\\drawable-nodpi-v4\\\\achievements.png\" \"C:\\\\Users\\\\797ng\\\\AndroidStudioProjects\\\\MyStats\\\\app\\\\src\\\\main\\\\res\\\\drawable-nodpi\\\\achievements.png\")"
+      "Bash(copy \"C:\\\\Users\\\\797ng\\\\AndroidStudioProjects\\\\MyStats\\\\app\\\\build\\\\intermediates\\\\packaged_res\\\\debug\\\\packageDebugResources\\\\drawable-nodpi-v4\\\\achievements.png\" \"C:\\\\Users\\\\797ng\\\\AndroidStudioProjects\\\\MyStats\\\\app\\\\src\\\\main\\\\res\\\\drawable-nodpi\\\\achievements.png\")",
+      "Bash(grep -l \"StrengthAchievements\\\\|Inbox\\\\|DevAchievements\" /c/Users/797ng/Documents/GitHub/AchievementLog/src/*.js)"
     ]
   }
 }
