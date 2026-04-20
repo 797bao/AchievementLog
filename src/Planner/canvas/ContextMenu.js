@@ -129,9 +129,9 @@ function SystemMenu({ targetId, targetData, onOpenModal, onCreateSubSystem, onUp
       </div>
       {showColors && (
         <div className="ctx-color-panel">
-          <ColorPicker label="Header Background" value={headerBg} onChange={handleBgChange} />
+          <ColorPicker label="Header Background" value={headerBg} defaultValue="" onChange={handleBgChange} />
           <div className="ctx-color-spacer" />
-          <ColorPicker label="Header Text" value={headerText} onChange={handleTextChange} />
+          <ColorPicker label="Header Text" value={headerText} defaultValue="" onChange={handleTextChange} />
         </div>
       )}
       <div className="ctx-sep" />

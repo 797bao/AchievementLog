@@ -42,6 +42,8 @@ export default function CanvasViewport({
 
   // Arrow drawing mode: { fromId } or null
   const [arrowMode, setArrowMode] = useState(null);
+  // Arrow preview: canvas coordinates of the current mouse position
+  const [arrowPreview, setArrowPreview] = useState(null);
 
   const {
     mapZoom,
@@ -69,16 +71,10 @@ export default function CanvasViewport({
     }
 
     if (state.type === 'standalone' && state.sysId) {
-      const sys = milestone.frames
-        .flatMap((f) => f.systems)
-        .find((s) => s.id === state.sysId);
+      const sys = findTask(state.sysId, milestone);
       if (sys && onOpenBoard) onOpenBoard(state.sysId, sys.name);
     } else if (state.type === 'system') {
-      const allSystems = [
-        ...milestone.frames.flatMap((f) => f.systems),
-        ...(milestone.looseSystems || []),
-      ];
-      const sys = allSystems.find((s) => s.id === state.id);
+      const sys = findTask(state.id, milestone);
       if (sys && onOpenBoard) onOpenBoard(state.id, sys.name);
     }
   }, [milestone, onOpenBoard, arrowMode, onAddArrow]);
@@ -96,13 +92,42 @@ export default function CanvasViewport({
 
   const resizeRef = useRef(null);
 
-  // Cancel arrow mode on Escape
+  // Cancel arrow mode on Escape + highlight source element + track mouse for preview
   useEffect(() => {
-    if (!arrowMode) return;
-    const handler = (e) => { if (e.key === 'Escape') setArrowMode(null); };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [arrowMode]);
+    if (!arrowMode) {
+      setArrowPreview(null);
+      return;
+    }
+    // Highlight source element
+    const container = mapInnerRef.current;
+    if (container) {
+      const srcEl =
+        container.querySelector('[data-frame-id="' + arrowMode.fromId + '"]') ||
+        container.querySelector('[data-sys-id="' + arrowMode.fromId + '"]') ||
+        container.querySelector('[data-task-id="' + arrowMode.fromId + '"]');
+      if (srcEl) srcEl.classList.add('arrow-source-highlight');
+    }
+
+    const keyHandler = (e) => { if (e.key === 'Escape') setArrowMode(null); };
+    const moveHandler = (e) => {
+      if (!vpRef.current) return;
+      const rect = vpRef.current.getBoundingClientRect();
+      const cp = screenToCanvas(e.clientX, e.clientY, rect);
+      setArrowPreview({ x: cp.x, y: cp.y });
+    };
+
+    document.addEventListener('keydown', keyHandler);
+    window.addEventListener('mousemove', moveHandler);
+    return () => {
+      document.removeEventListener('keydown', keyHandler);
+      window.removeEventListener('mousemove', moveHandler);
+      // Remove source highlight
+      if (container) {
+        const highlighted = container.querySelector('.arrow-source-highlight');
+        if (highlighted) highlighted.classList.remove('arrow-source-highlight');
+      }
+    };
+  }, [arrowMode, screenToCanvas]);
 
   const handleStartArrow = useCallback((fromId) => {
     setArrowMode({ fromId });
@@ -263,6 +288,7 @@ export default function CanvasViewport({
           arrows={milestone.arrows || []}
           containerRef={mapInnerRef}
           onDeleteArrow={handleDeleteArrowDirect}
+          preview={arrowMode && arrowPreview ? { fromId: arrowMode.fromId, toX: arrowPreview.x, toY: arrowPreview.y } : null}
         />
 
         {milestone.frames.map((frame) =>

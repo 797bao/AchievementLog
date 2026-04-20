@@ -445,7 +445,6 @@
   border: 1px solid #3c3f47;
   border-radius: 10px;
   min-width: 210px;
-  max-width: 320px;
   flex: 1;
   overflow: visible;
   transition: all 0.2s;
@@ -490,7 +489,7 @@
 .system-box-progress {
   height: 3px;
   background: #3c3f47;
-  margin: 0 12px 8px;
+  margin: 4px 12px 8px;
   border-radius: 2px;
   overflow: hidden;
 }
@@ -502,15 +501,22 @@
 
 .system-box-body {
   padding: 0 12px 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
-.system-box-time {
-  font-size: 10px;
-  color: #5f6368;
-  padding: 5px 12px 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.04);
-  display: flex;
-  justify-content: space-between;
+/* ── System time pill (in header) ── */
+.system-box-time-pill {
+  font-size: 9px;
+  color: #8ab4f8;
+  font-weight: 700;
+  background: rgba(138, 180, 248, 0.1);
+  padding: 2px 6px;
+  border-radius: 8px;
+  pointer-events: none;
+  white-space: nowrap;
+  font-family: -apple-system, sans-serif;
 }
 
 /* ── Loose System (standalone on canvas) ── */
@@ -527,10 +533,11 @@
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid #3c3f47;
   border-radius: 8px;
-  margin-bottom: 6px;
   overflow: hidden;
   transition: all 0.15s;
   position: relative;
+  flex: 1;
+  min-width: 180px;
 }
 
 .sub-group.drop-highlight {
@@ -1102,9 +1109,16 @@
   color: #80868b;
 }
 
+/* ── Loose items inside system body ── */
+.loose-items {
+  flex: 1;
+  min-width: 180px;
+}
+
 /* ── Nested system wrapper ── */
 .nested-system-wrapper {
-  margin: 4px 0;
+  flex: 1;
+  min-width: 180px;
 }
 
 .nested-system-wrapper .system-box {
@@ -1312,6 +1326,29 @@
   border-color: rgba(251, 188, 4, 0.3);
 }
 
+/* ── Color Picker Reset ── */
+.cp-reset-row {
+  margin-bottom: 8px;
+}
+
+.cp-reset-btn {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid #3c3f47;
+  color: #9aa0a6;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.cp-reset-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e8eaed;
+  border-color: #5f6368;
+}
+
 /* ── Context menu danger item (Delete) ── */
 .ctx-danger {
   color: #ea4335 !important;
@@ -1367,6 +1404,32 @@
 .arrow-mode-indicator span {
   cursor: pointer;
   text-decoration: underline;
+}
+
+/* ── Arrow mode target highlighting ── */
+.map-viewport.arrow-mode .system-box:hover,
+.map-viewport.arrow-mode .canvas-frame:hover,
+.map-viewport.arrow-mode .standalone-node:hover,
+.map-viewport.arrow-mode .loose-task:hover,
+.map-viewport.arrow-mode .task-item:hover {
+  outline: 2px solid #8ab4f8 !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 12px rgba(138, 180, 248, 0.3) !important;
+}
+
+.map-viewport.arrow-mode .system-box,
+.map-viewport.arrow-mode .canvas-frame,
+.map-viewport.arrow-mode .standalone-node,
+.map-viewport.arrow-mode .loose-task,
+.map-viewport.arrow-mode .task-item {
+  cursor: crosshair !important;
+}
+
+/* ── Arrow source highlight ── */
+.arrow-source-highlight {
+  outline: 2px solid #fbbc04 !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 16px rgba(251, 188, 4, 0.3) !important;
 }
 
 /* ── Planner Modal ── */
@@ -1593,7 +1656,4 @@
   border-color: #ea4335 !important;
 }
 
-/* ── System box time bolder ── */
-.system-box-time {
-  font-weight: 600;
-}
+/* (system-box-time moved to header pill) */

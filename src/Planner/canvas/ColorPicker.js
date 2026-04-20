@@ -14,7 +14,7 @@ function saveFavorites(favs) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(favs));
 }
 
-export default function ColorPicker({ label, value, onChange, onClose }) {
+export default function ColorPicker({ label, value, onChange, defaultValue, onClose }) {
   const [hex, setHex] = useState(value || '#4285f4');
   const [favorites, setFavorites] = useState(loadFavorites);
 
@@ -54,8 +54,19 @@ export default function ColorPicker({ label, value, onChange, onClose }) {
     saveFavorites(updated);
   }, [favorites]);
 
+  const handleReset = useCallback(() => {
+    const def = defaultValue || '';
+    setHex(def || '#4285f4');
+    onChange(def);
+  }, [defaultValue, onChange]);
+
+  // Prevent mousedown from bubbling to the outside-click handler
+  const stopMouse = useCallback((e) => {
+    e.stopPropagation();
+  }, []);
+
   return (
-    <div className="color-picker-popover" onClick={(e) => e.stopPropagation()}>
+    <div className="color-picker-popover" onMouseDown={stopMouse} onClick={(e) => e.stopPropagation()}>
       {label && <div className="cp-label">{label}</div>}
 
       {/* Current color + hex input */}
@@ -72,6 +83,13 @@ export default function ColorPicker({ label, value, onChange, onClose }) {
         />
         <button className="cp-fav-btn" onClick={addFavorite} title="Add to favorites">
           &#9733;
+        </button>
+      </div>
+
+      {/* Default / None option */}
+      <div className="cp-reset-row">
+        <button className="cp-reset-btn" onClick={handleReset}>
+          &#10006; None / Default
         </button>
       </div>
 

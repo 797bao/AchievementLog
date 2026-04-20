@@ -33,9 +33,14 @@ export default function SystemBox({ system, depth = 0 }) {
     <div className="system-box" data-sys-id={system.id}>
       <div className="system-box-header" style={headerStyle}>
         <div className="system-box-name" style={nameStyle}>{system.name}</div>
-        <div className={`system-box-badge ${progClass}`}>
-          {prog.done}/{prog.total}
-        </div>
+        {totalT > 0 && (
+          <div className="system-box-time-pill">{formatTime(doneT)}/{formatTime(totalT)}</div>
+        )}
+        {prog.total > 0 && (
+          <div className={`system-box-badge ${progClass}`}>
+            {prog.done}/{prog.total}
+          </div>
+        )}
       </div>
       <div className="system-box-progress">
         <div
@@ -62,10 +67,6 @@ export default function SystemBox({ system, depth = 0 }) {
             ))}
           </div>
         )}
-      </div>
-      <div className="system-box-time">
-        <span>{formatTime(doneT)} / {formatTime(totalT)}</span>
-        <span>{prog.pct}%</span>
       </div>
     </div>
   );

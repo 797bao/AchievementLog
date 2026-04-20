@@ -21,7 +21,8 @@ export function sprintShort(key) {
 
 /* ─── Tree traversal ─── */
 export function getLeaves(node) {
-  if (!node.children || !node.children.length) return [node];
+  if (!node.children) return [node]; // leaf task
+  if (node.children.length === 0) return []; // empty container
   let result = [];
   node.children.forEach((c) => {
     result = result.concat(getLeaves(c));
