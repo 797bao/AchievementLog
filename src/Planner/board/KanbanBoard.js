@@ -16,6 +16,8 @@ export default function KanbanBoard({
   onUnassign,
   getSystemName,
   getParentName,
+  onOpenModal,
+  onDeleteTask,
 }) {
   const { onDragStart, onDragEnd, onDragOver, onDragLeave, onDrop } = useKanbanDragDrop({
     onStatusChange,
@@ -61,6 +63,8 @@ export default function KanbanBoard({
           onUnassign={onUnassign}
           getSystemName={getSystemName}
           getParentName={getParentName}
+          onOpenModal={onOpenModal}
+          onDeleteTask={onDeleteTask}
         />
       ))}
     </div>

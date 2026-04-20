@@ -17,6 +17,8 @@ export default function KanbanColumn({
   onUnassign,
   getSystemName,
   getParentName,
+  onOpenModal,
+  onDeleteTask,
 }) {
   const headerClass = status === 'progress' ? 'kh-progress' : `kh-${status}`;
 
@@ -32,9 +34,7 @@ export default function KanbanColumn({
         onDragLeave={onDragLeave}
         onDrop={(e) => onDrop(e, status)}
       >
-        {items.length === 0 && (
-          <div className="kanban-empty">No tasks</div>
-        )}
+        {items.length === 0 && <div className="kanban-empty">No tasks</div>}
         {items.map((item) => (
           <KanbanCard
             key={item.id}
@@ -48,6 +48,8 @@ export default function KanbanColumn({
             onDragEnd={onDragEnd}
             onAssign={onAssign}
             onUnassign={onUnassign}
+            onOpenModal={onOpenModal}
+            onDeleteTask={onDeleteTask}
           />
         ))}
       </div>

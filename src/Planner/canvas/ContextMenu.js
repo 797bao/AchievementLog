@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import ColorPicker from './ColorPicker';
-import { TYPE_ICON_FILES, STATUS_COLORS, STATUS_LABELS, STATUSES } from '../plannerData';
-import { iconFor } from '../plannerHelpers';
+import { STATUS_COLORS, STATUS_LABELS, STATUSES } from '../plannerData';
 
 /* ─── Canvas context menu (right-click on empty space) ─── */
 function CanvasMenu({ onNewTask, onNewSystem, onNewFrame, onClose }) {
@@ -17,28 +16,21 @@ function CanvasMenu({ onNewTask, onNewSystem, onNewFrame, onClose }) {
 }
 
 /* ─── Task context menu ─── */
-function TaskMenu({ targetId, targetData, onRenameTask, onChangeTaskIcon, onSetTaskTime, onUpdateTaskStatus, onClose }) {
-  const [showIcons, setShowIcons] = useState(false);
+function TaskMenu({ targetId, targetData, onOpenModal, onUpdateTaskStatus, onDeleteTask, onStartArrow, onClose }) {
   const [showStatus, setShowStatus] = useState(false);
 
-  const handleRename = () => {
-    const newName = window.prompt('Rename task:', targetData?.name || '');
-    if (newName !== null && newName.trim()) {
-      onRenameTask(targetId, newName.trim());
-    }
-    onClose();
-  };
-
-  const handleSetTime = () => {
-    const newTime = window.prompt('Set expected time (e.g. 2h, 30m, 1.5h):', targetData?.time || '');
-    if (newTime !== null) {
-      onSetTaskTime(targetId, newTime.trim() || null);
-    }
-    onClose();
-  };
-
-  const handleIconSelect = (type) => {
-    onChangeTaskIcon(targetId, type);
+  const handleEdit = () => {
+    onOpenModal({
+      type: 'edit-task',
+      title: 'Edit Task',
+      targetId,
+      fields: [
+        { key: 'name', label: 'Name', type: 'text', value: targetData?.name || '' },
+        { key: 'time', label: 'Expected Time', type: 'text', value: targetData?.time || '', placeholder: 'e.g. 2h, 30m' },
+        { key: 'type', label: 'Icon Type', type: 'icon-select', value: targetData?.type || 'script' },
+        { key: 'status', label: 'Status', type: 'status-select', value: targetData?.status || 'planned' },
+      ],
+    });
     onClose();
   };
 
@@ -47,32 +39,22 @@ function TaskMenu({ targetId, targetData, onRenameTask, onChangeTaskIcon, onSetT
     onClose();
   };
 
+  const handleArrow = () => {
+    onStartArrow(targetId);
+    onClose();
+  };
+
+  const handleDelete = () => {
+    onDeleteTask(targetId);
+    onClose();
+  };
+
   return (
     <>
-      <div className="ctx-item" onClick={handleRename}>&#9998; Rename</div>
-      <div className="ctx-item" onClick={() => setShowIcons(!showIcons)}>
-        &#127912; Change Icon {showIcons ? '▾' : '▸'}
-      </div>
-      {showIcons && (
-        <div className="ctx-icon-grid">
-          {Object.entries(TYPE_ICON_FILES).map(([type, src]) => (
-            <div
-              key={type}
-              className={`ctx-icon-item${targetData?.type === type ? ' active' : ''}`}
-              onClick={() => handleIconSelect(type)}
-              title={type}
-            >
-              <img src={src} alt={type} className="ctx-icon-img" />
-              <span className="ctx-icon-label">{type}</span>
-            </div>
-          ))}
-        </div>
-      )}
-      <div className="ctx-sep" />
-      <div className="ctx-item" onClick={handleSetTime}>&#9201; Set Time</div>
+      <div className="ctx-item" onClick={handleEdit}>&#9998; Edit Task</div>
       <div className="ctx-sep" />
       <div className="ctx-item" onClick={() => setShowStatus(!showStatus)}>
-        &#9679; Status {showStatus ? '▾' : '▸'}
+        &#9679; Status {showStatus ? '\u25BE' : '\u25B8'}
       </div>
       {showStatus && (
         <div className="ctx-status-list">
@@ -88,21 +70,27 @@ function TaskMenu({ targetId, targetData, onRenameTask, onChangeTaskIcon, onSetT
           ))}
         </div>
       )}
+      <div className="ctx-sep" />
+      <div className="ctx-item" onClick={handleArrow}>&#10140; Draw Arrow</div>
+      <div className="ctx-sep" />
+      <div className="ctx-item ctx-danger" onClick={handleDelete}>&#128465; Delete</div>
     </>
   );
 }
 
 /* ─── System context menu ─── */
-function SystemMenu({ targetId, targetData, onRenameSystem, onCreateSubSystem, onUpdateSystemColors, onClose }) {
+function SystemMenu({ targetId, targetData, onOpenModal, onCreateSubSystem, onUpdateSystemColors, onDeleteSystem, onStartArrow, onClose }) {
   const [showColors, setShowColors] = useState(false);
   const [headerBg, setHeaderBg] = useState(targetData?.headerBg || '#23262e');
   const [headerText, setHeaderText] = useState(targetData?.headerText || '#e8eaed');
 
   const handleRename = () => {
-    const newName = window.prompt('Rename system:', targetData?.name || '');
-    if (newName !== null && newName.trim()) {
-      onRenameSystem(targetId, newName.trim());
-    }
+    onOpenModal({
+      type: 'rename-system',
+      title: 'Rename System',
+      targetId,
+      fields: [{ key: 'name', label: 'Name', type: 'text', value: targetData?.name || '' }],
+    });
     onClose();
   };
 
@@ -121,29 +109,68 @@ function SystemMenu({ targetId, targetData, onRenameSystem, onCreateSubSystem, o
     onUpdateSystemColors(targetId, { headerText: color });
   };
 
+  const handleArrow = () => {
+    onStartArrow(targetId);
+    onClose();
+  };
+
+  const handleDelete = () => {
+    onDeleteSystem(targetId);
+    onClose();
+  };
+
   return (
     <>
       <div className="ctx-item" onClick={handleRename}>&#9998; Rename</div>
       <div className="ctx-item" onClick={handleAddSub}>&#10010; New Sub-System</div>
       <div className="ctx-sep" />
       <div className="ctx-item" onClick={() => setShowColors(!showColors)}>
-        &#127912; Edit Colors {showColors ? '▾' : '▸'}
+        &#127912; Edit Colors {showColors ? '\u25BE' : '\u25B8'}
       </div>
       {showColors && (
         <div className="ctx-color-panel">
-          <ColorPicker
-            label="Header Background"
-            value={headerBg}
-            onChange={handleBgChange}
-          />
+          <ColorPicker label="Header Background" value={headerBg} onChange={handleBgChange} />
           <div className="ctx-color-spacer" />
-          <ColorPicker
-            label="Header Text"
-            value={headerText}
-            onChange={handleTextChange}
-          />
+          <ColorPicker label="Header Text" value={headerText} onChange={handleTextChange} />
         </div>
       )}
+      <div className="ctx-sep" />
+      <div className="ctx-item" onClick={handleArrow}>&#10140; Draw Arrow</div>
+      <div className="ctx-sep" />
+      <div className="ctx-item ctx-danger" onClick={handleDelete}>&#128465; Delete</div>
+    </>
+  );
+}
+
+/* ─── Frame context menu ─── */
+function FrameMenu({ targetId, targetData, onOpenModal, onDeleteFrame, onStartArrow, onClose }) {
+  const handleRename = () => {
+    onOpenModal({
+      type: 'rename-frame',
+      title: 'Rename Frame',
+      targetId,
+      fields: [{ key: 'label', label: 'Label', type: 'text', value: targetData?.label || '' }],
+    });
+    onClose();
+  };
+
+  const handleArrow = () => {
+    onStartArrow(targetId);
+    onClose();
+  };
+
+  const handleDelete = () => {
+    onDeleteFrame(targetId);
+    onClose();
+  };
+
+  return (
+    <>
+      <div className="ctx-item" onClick={handleRename}>&#9998; Rename</div>
+      <div className="ctx-sep" />
+      <div className="ctx-item" onClick={handleArrow}>&#10140; Draw Arrow</div>
+      <div className="ctx-sep" />
+      <div className="ctx-item ctx-danger" onClick={handleDelete}>&#128465; Delete</div>
     </>
   );
 }
@@ -151,44 +178,39 @@ function SystemMenu({ targetId, targetData, onRenameSystem, onCreateSubSystem, o
 /* ─── Main ContextMenu component ─── */
 export default function ContextMenu({
   x, y, type = 'canvas', targetId, targetData,
-  // Canvas actions
   onNewTask, onNewSystem, onNewFrame,
-  // Task actions
-  onRenameTask, onChangeTaskIcon, onSetTaskTime, onUpdateTaskStatus,
-  // System actions
-  onRenameSystem, onCreateSubSystem, onUpdateSystemColors,
-  // Common
+  onOpenModal,
+  onUpdateTaskStatus,
+  onCreateSubSystem, onUpdateSystemColors,
+  onDeleteTask, onDeleteSystem, onDeleteFrame,
+  onStartArrow,
   onClose,
 }) {
   return (
     <div className="context-menu" style={{ left: x, top: y }}>
       {type === 'canvas' && (
-        <CanvasMenu
-          onNewTask={onNewTask}
-          onNewSystem={onNewSystem}
-          onNewFrame={onNewFrame}
-          onClose={onClose}
-        />
+        <CanvasMenu onNewTask={onNewTask} onNewSystem={onNewSystem} onNewFrame={onNewFrame} onClose={onClose} />
       )}
       {type === 'task' && (
         <TaskMenu
-          targetId={targetId}
-          targetData={targetData}
-          onRenameTask={onRenameTask}
-          onChangeTaskIcon={onChangeTaskIcon}
-          onSetTaskTime={onSetTaskTime}
-          onUpdateTaskStatus={onUpdateTaskStatus}
-          onClose={onClose}
+          targetId={targetId} targetData={targetData}
+          onOpenModal={onOpenModal} onUpdateTaskStatus={onUpdateTaskStatus}
+          onDeleteTask={onDeleteTask} onStartArrow={onStartArrow} onClose={onClose}
         />
       )}
       {type === 'system' && (
         <SystemMenu
-          targetId={targetId}
-          targetData={targetData}
-          onRenameSystem={onRenameSystem}
-          onCreateSubSystem={onCreateSubSystem}
-          onUpdateSystemColors={onUpdateSystemColors}
-          onClose={onClose}
+          targetId={targetId} targetData={targetData}
+          onOpenModal={onOpenModal} onCreateSubSystem={onCreateSubSystem}
+          onUpdateSystemColors={onUpdateSystemColors} onDeleteSystem={onDeleteSystem}
+          onStartArrow={onStartArrow} onClose={onClose}
+        />
+      )}
+      {type === 'frame' && (
+        <FrameMenu
+          targetId={targetId} targetData={targetData}
+          onOpenModal={onOpenModal} onDeleteFrame={onDeleteFrame}
+          onStartArrow={onStartArrow} onClose={onClose}
         />
       )}
     </div>

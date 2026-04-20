@@ -1,29 +1,52 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './Planner.css';
 import PlannerSidebar from './PlannerSidebar';
 import FloatingUI from './FloatingUI';
 import CanvasViewport from './canvas/CanvasViewport';
 import BoardView from './board/BoardView';
+import PlannerModal from './canvas/PlannerModal';
 import usePlannerState from './hooks/usePlannerState';
 import { findTask } from './plannerHelpers';
 
 export default function Planner() {
   const state = usePlannerState();
+  const [modal, setModal] = useState(null);
 
-  // Escape key to close board
+  // Escape key to close board (but not if modal is open)
   useEffect(() => {
     const handler = (e) => {
-      if (e.key === 'Escape' && state.showBoard) {
-        state.closeBoard();
+      if (e.key === 'Escape') {
+        if (modal) { setModal(null); return; }
+        if (state.showBoard) state.closeBoard();
       }
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [state.showBoard, state.closeBoard]);
+  }, [state.showBoard, state.closeBoard, modal]);
 
   const handleOpenBoard = useCallback((nodeId, displayName) => {
     state.openBoard(nodeId, displayName || (findTask(nodeId, state.activeMilestone) || {}).name);
   }, [state.openBoard, state.activeMilestone]);
+
+  const handleOpenModal = useCallback((modalData) => {
+    setModal(modalData);
+  }, []);
+
+  const handleModalSubmit = useCallback((values) => {
+    if (!modal) return;
+
+    if (modal.type === 'edit-task') {
+      state.updateTask(modal.targetId, values);
+    } else if (modal.type === 'rename-system') {
+      if (values.name) state.renameSystem(modal.targetId, values.name);
+    } else if (modal.type === 'rename-frame') {
+      if (values.label !== undefined) state.renameFrame(modal.targetId, values.label);
+    } else if (modal.type === 'new-task-in-system') {
+      state.createTaskInSystem(modal.targetId, values);
+    }
+
+    setModal(null);
+  }, [modal, state]);
 
   return (
     <div className="planner">
@@ -59,15 +82,20 @@ export default function Planner() {
           onCreateTask={state.createNewTask}
           onCreateSystem={state.createNewSystem}
           onCreateFrame={state.createNewFrame}
-          // Task editing
           onRenameTask={state.renameTask}
           onChangeTaskIcon={state.changeTaskIcon}
           onSetTaskTime={state.setTaskTime}
           onUpdateTaskStatus={state.updateTaskStatus}
-          // System editing
+          onUpdateTask={state.updateTask}
+          onDeleteTask={state.deleteTask}
+          onDeleteSystem={state.deleteSystem}
+          onDeleteFrame={state.deleteFrame}
           onCreateSubSystem={state.createSubSystem}
           onRenameSystem={state.renameSystem}
           onUpdateSystemColors={state.updateSystemColors}
+          onAddArrow={state.addArrow}
+          onDeleteArrow={state.deleteArrow}
+          onOpenModal={handleOpenModal}
         />
 
         <BoardView
@@ -84,8 +112,21 @@ export default function Planner() {
           onUpdateTaskOrder={state.updateTaskOrder}
           onAssign={state.assignSprint}
           onUnassign={state.unassignSprint}
+          onOpenModal={handleOpenModal}
+          onDeleteTask={state.deleteTask}
+          onCreateTaskInSystem={state.createTaskInSystem}
         />
       </div>
+
+      {/* Global Modal */}
+      {modal && (
+        <PlannerModal
+          title={modal.title}
+          fields={modal.fields}
+          onSubmit={handleModalSubmit}
+          onClose={() => setModal(null)}
+        />
+      )}
     </div>
   );
 }

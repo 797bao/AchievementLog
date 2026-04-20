@@ -1,6 +1,5 @@
 import React, { useMemo } from 'react';
 import KanbanBoard from './KanbanBoard';
-import { MONTH_NAMES } from '../plannerData';
 import {
   getAllLeaves,
   getLeaves,
@@ -30,10 +29,12 @@ export default function BoardView({
   onUpdateTaskOrder,
   onAssign,
   onUnassign,
+  onOpenModal,
+  onDeleteTask,
+  onCreateTaskInSystem,
 }) {
   const isActive = isSprintOverview || !!currentBoardId;
 
-  // Sprint board data
   const sprintData = useMemo(() => {
     if (!isSprintOverview) return null;
     const allLeaves = getAllLeaves(milestone);
@@ -44,7 +45,6 @@ export default function BoardView({
     return { filtered, count: filtered.length, done, timeEst: formatTime(timeEst) };
   }, [isSprintOverview, milestone, mk]);
 
-  // System board data
   const systemData = useMemo(() => {
     if (!currentBoardId) return null;
     const node = findTask(currentBoardId, milestone);
@@ -72,6 +72,22 @@ export default function BoardView({
     return findParentName(tid, node) || '';
   };
 
+  const handleNewTask = () => {
+    if (onOpenModal) {
+      onOpenModal({
+        type: 'new-task-in-system',
+        title: 'New Task',
+        targetId: currentBoardId,
+        fields: [
+          { key: 'name', label: 'Name', type: 'text', value: '', placeholder: 'Task name' },
+          { key: 'time', label: 'Expected Time', type: 'text', value: '', placeholder: 'e.g. 2h, 30m' },
+          { key: 'type', label: 'Icon Type', type: 'icon-select', value: 'script' },
+          { key: 'status', label: 'Status', type: 'status-select', value: 'planned' },
+        ],
+      });
+    }
+  };
+
   if (!isActive) return null;
 
   return (
@@ -79,13 +95,9 @@ export default function BoardView({
       {isSprintOverview && sprintData && (
         <>
           <div className="board-header">
-            <button className="board-back" onClick={onCloseBoard}>
-              &#9664; Map
-            </button>
+            <button className="board-back" onClick={onCloseBoard}>&#9664; Map</button>
             <div>
-              <div className="board-title">
-                Sprint: {monthLabel(boardMonth.year, boardMonth.month)}
-              </div>
+              <div className="board-title">Sprint: {monthLabel(boardMonth.year, boardMonth.month)}</div>
               <div className="board-subtitle">{milestone.name}</div>
             </div>
           </div>
@@ -95,29 +107,17 @@ export default function BoardView({
             <span className="val">{sprintData.timeEst}</span> est.
           </div>
           <div className="board-month-nav">
-            <button className="bm-btn" onClick={() => onChangeSidebarMonth(-1)}>
-              &#9664;
-            </button>
-            <div className="bm-label">
-              {monthLabel(boardMonth.year, boardMonth.month)}
-            </div>
-            <button className="bm-btn" onClick={() => onChangeSidebarMonth(1)}>
-              &#9654;
-            </button>
+            <button className="bm-btn" onClick={() => onChangeSidebarMonth(-1)}>&#9664;</button>
+            <div className="bm-label">{monthLabel(boardMonth.year, boardMonth.month)}</div>
+            <button className="bm-btn" onClick={() => onChangeSidebarMonth(1)}>&#9654;</button>
           </div>
           <KanbanBoard
-            items={sprintData.filtered}
-            showSystem={true}
-            mk={mk}
-            boardMonth={boardMonth}
-            boardKey={boardKey}
-            taskOrder={taskOrder}
-            onStatusChange={onStatusChange}
-            onUpdateTaskOrder={onUpdateTaskOrder}
-            onAssign={onAssign}
-            onUnassign={onUnassign}
-            getSystemName={getSystemName}
-            getParentName={() => ''}
+            items={sprintData.filtered} showSystem={true}
+            mk={mk} boardMonth={boardMonth} boardKey={boardKey} taskOrder={taskOrder}
+            onStatusChange={onStatusChange} onUpdateTaskOrder={onUpdateTaskOrder}
+            onAssign={onAssign} onUnassign={onUnassign}
+            getSystemName={getSystemName} getParentName={() => ''}
+            onOpenModal={onOpenModal} onDeleteTask={onDeleteTask}
           />
         </>
       )}
@@ -125,10 +125,9 @@ export default function BoardView({
       {currentBoardId && systemData && (
         <>
           <div className="board-header">
-            <button className="board-back" onClick={onCloseBoard}>
-              &#9664; Map
-            </button>
+            <button className="board-back" onClick={onCloseBoard}>&#9664; Map</button>
             <div className="board-title">{currentBoardPath}</div>
+            <button className="board-new-task-btn" onClick={handleNewTask}>+ New Task</button>
           </div>
           <div className="board-stats">
             <span className="val">{systemData.prog.done}/{systemData.prog.total}</span> tasks &middot;{' '}
@@ -136,18 +135,12 @@ export default function BoardView({
             <span className="val">{systemData.doneT}</span>/{systemData.totalT}
           </div>
           <KanbanBoard
-            items={systemData.allLeaves}
-            showSystem={false}
-            mk={mk}
-            boardMonth={boardMonth}
-            boardKey={boardKey}
-            taskOrder={taskOrder}
-            onStatusChange={onStatusChange}
-            onUpdateTaskOrder={onUpdateTaskOrder}
-            onAssign={onAssign}
-            onUnassign={onUnassign}
-            getSystemName={() => ''}
-            getParentName={getParentNameForTask}
+            items={systemData.allLeaves} showSystem={false}
+            mk={mk} boardMonth={boardMonth} boardKey={boardKey} taskOrder={taskOrder}
+            onStatusChange={onStatusChange} onUpdateTaskOrder={onUpdateTaskOrder}
+            onAssign={onAssign} onUnassign={onUnassign}
+            getSystemName={() => ''} getParentName={getParentNameForTask}
+            onOpenModal={onOpenModal} onDeleteTask={onDeleteTask}
           />
         </>
       )}
