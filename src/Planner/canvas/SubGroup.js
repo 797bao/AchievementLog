@@ -17,7 +17,7 @@ export default function SubGroup({ group }) {
     <div className={`sub-group resizable-node${prog.pct === 100 ? ' group-done' : ''}`} data-sys-id={group.id} style={style}>
       <div className="sub-group-header">
         <div className="sub-group-name">{group.name}</div>
-        <span className="sub-group-time">{formatTime(loggedT)}/{formatTime(expectedT)}</span>
+        <span className={`sub-group-time${loggedT > expectedT && expectedT > 0 ? ' time-over' : ''}`}>{formatTime(loggedT)}/{formatTime(expectedT)}</span>
         <div className={`sub-group-badge ${progClass}`}>
           {prog.done}/{prog.total}
         </div>

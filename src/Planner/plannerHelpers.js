@@ -134,12 +134,14 @@ export function snapToGrid(val, gridSize = GRID_SIZE) {
 export function getFrameTotalTime(frame) {
   let total = 0;
   (frame.systems || []).forEach((sys) => { total += getTotalTime(sys); });
+  (frame.tasks || []).forEach((t) => { total += getTaskExpectedTime(t); });
   return total;
 }
 
 export function getFrameLoggedTime(frame) {
   let total = 0;
   (frame.systems || []).forEach((sys) => { total += getLoggedTime(sys); });
+  (frame.tasks || []).forEach((t) => { total += getTaskLoggedTime(t); });
   return total;
 }
 
@@ -149,6 +151,9 @@ export function getAllLeaves(ms) {
   ms.frames.forEach((f) => {
     f.systems.forEach((s) => {
       all = all.concat(getLeaves(s));
+    });
+    (f.tasks || []).forEach((t) => {
+      all.push(t);
     });
   });
   (ms.looseSystems || []).forEach((s) => {
@@ -177,6 +182,10 @@ export function findTask(id, ms) {
       const found = findInNode(id, ms.frames[i].systems[j]);
       if (found) return found;
     }
+    const ft = ms.frames[i].tasks || [];
+    for (let j = 0; j < ft.length; j++) {
+      if (ft[j].id === id) return ft[j];
+    }
   }
   const ls = ms.looseSystems || [];
   for (let i = 0; i < ls.length; i++) {
@@ -196,6 +205,7 @@ export function findSystemForTask(tid, ms) {
       const sys = ms.frames[i].systems[j];
       if (findInNode(tid, sys)) return sys;
     }
+    // frame-level tasks have no parent system
   }
   const ls = ms.looseSystems || [];
   for (let i = 0; i < ls.length; i++) {
@@ -236,6 +246,10 @@ export function removeTaskFromTree(taskId, ms) {
   for (let i = 0; i < ms.frames.length; i++) {
     for (let j = 0; j < ms.frames[i].systems.length; j++) {
       if (removeFromNode(taskId, ms.frames[i].systems[j])) return true;
+    }
+    const ft = ms.frames[i].tasks || [];
+    for (let j = 0; j < ft.length; j++) {
+      if (ft[j].id === taskId) { ft.splice(j, 1); return true; }
     }
   }
   const ls = ms.looseSystems || [];

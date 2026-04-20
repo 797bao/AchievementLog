@@ -45,8 +45,8 @@ export default function SystemBox({ system, depth = 0, resizable = false }) {
     >
       <div className="system-box-header" style={headerStyle}>
         <div className="system-box-name" style={nameStyle}>{system.name}</div>
-        {expectedT > 0 && (
-          <div className="system-box-time-pill">{formatTime(loggedT)}/{formatTime(expectedT)}</div>
+        {(expectedT > 0 || loggedT > 0) && (
+          <div className={`system-box-time-pill${loggedT > expectedT && expectedT > 0 ? ' time-over' : ''}`}>{formatTime(loggedT)}/{formatTime(expectedT)}</div>
         )}
         {prog.total > 0 && (
           <div className={`system-box-badge ${progClass}`}>

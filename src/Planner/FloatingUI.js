@@ -18,7 +18,7 @@ export default function FloatingUI({ totalStats, showBreadcrumb, milestoneName }
           <span className="sp-val">{totalStats.pct}%</span>
         </div>
         <div className="sp-row">
-          <span className="sp-val">{totalStats.loggedTime}</span> / {totalStats.totalTime}
+          <span className={`sp-val${totalStats.rawLogged > totalStats.rawExpected && totalStats.rawExpected > 0 ? ' time-over' : ''}`}>{totalStats.loggedTime}</span> / {totalStats.totalTime}
         </div>
       </div>
     </>

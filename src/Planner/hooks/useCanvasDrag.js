@@ -35,6 +35,8 @@ export default function useCanvasDrag({ mapZoom, screenToCanvas, onDropTask, onD
       if (sg && sg.dataset.sysId !== dragId) return { type: 'subgroup', id: sg.dataset.sysId, el: sg };
       const sb = el.closest('.system-box');
       if (sb && sb.dataset.sysId !== dragId) return { type: 'system', id: sb.dataset.sysId, el: sb };
+      const fr = el.closest('.canvas-frame');
+      if (fr) return { type: 'frame', id: fr.dataset.frameId, el: fr };
     }
     if (dragType === 'system') {
       // Allow dropping system into another system (nested)

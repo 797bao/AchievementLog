@@ -56,7 +56,7 @@ export default function BoardView({
     const prog = getProgress(node);
     const expectedT = getTotalTime(node);
     const loggedT = getLoggedTime(node);
-    return { node, allLeaves, prog, expectedT: formatTime(expectedT), loggedT: formatTime(loggedT) };
+    return { node, allLeaves, prog, expectedT: formatTime(expectedT), loggedT: formatTime(loggedT), rawExpected: expectedT, rawLogged: loggedT };
   }, [currentBoardId, milestone]);
 
   const boardKey = isSprintOverview
@@ -135,7 +135,7 @@ export default function BoardView({
           <div className="board-stats">
             <span className="val">{systemData.prog.done}/{systemData.prog.total}</span> tasks &middot;{' '}
             <span className="val">{systemData.prog.pct}%</span> &middot;{' '}
-            <span className="val">{systemData.loggedT}</span>/{systemData.expectedT}
+            <span className={`val${systemData.rawLogged > systemData.rawExpected && systemData.rawExpected > 0 ? ' time-over' : ''}`}>{systemData.loggedT}</span>/{systemData.expectedT}
           </div>
           <KanbanBoard
             items={systemData.allLeaves} showSystem={false}

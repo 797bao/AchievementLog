@@ -426,6 +426,12 @@
   text-align: center;
 }
 
+/* ── Frame-level tasks (loose tasks inside a frame) ── */
+.frame-tasks {
+  min-width: 180px;
+  flex: 1;
+}
+
 /* ── Standalone Node ── */
 .standalone-node {
   background: #1e2028;
@@ -2313,6 +2319,11 @@
 
 .planner-img-wrap:hover .pimg-resize {
   opacity: 1;
+}
+
+/* ── Time over budget (logged > expected) ── */
+.time-over {
+  color: #ea4335 !important;
 }
 
 /* Context menu image priority info */

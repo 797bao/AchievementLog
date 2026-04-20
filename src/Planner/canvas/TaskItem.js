@@ -16,8 +16,8 @@ export default function TaskItem({ task }) {
       />
       <img className="task-icon" src={iconFor(task.type)} alt={task.type} />
       <div className={`task-name${isDone ? ' done' : ''}`}>{task.name}</div>
-      {expectedMins > 0 && (
-        <span className={`task-time ${statusCls}`}>
+      {(expectedMins > 0 || loggedMins > 0) && (
+        <span className={`task-time ${statusCls}${loggedMins > expectedMins && expectedMins > 0 ? ' time-over' : ''}`}>
           {loggedMins > 0 ? `${formatTime(loggedMins)}/` : ''}{formatTime(expectedMins)}
         </span>
       )}

@@ -70,7 +70,7 @@ export default function usePlannerState(initialData) {
       expectedTime += getTaskExpectedTime(l);
       loggedTime += getTaskLoggedTime(l);
     });
-    return { done, total, pct, totalTime: formatTime(expectedTime), loggedTime: formatTime(loggedTime) };
+    return { done, total, pct, totalTime: formatTime(expectedTime), loggedTime: formatTime(loggedTime), rawExpected: expectedTime, rawLogged: loggedTime };
   }, [allLeaves]);
 
   const showBreadcrumb = !isSprintOverview && !currentBoardId;
@@ -309,6 +309,12 @@ export default function usePlannerState(initialData) {
           if (!targetNode.children) targetNode.children = [];
           targetNode.children.push(taskCopy);
         }
+      } else if (target && target.type === 'frame') {
+        const frame = milestone.frames.find((f) => f.id === target.id);
+        if (frame) {
+          if (!frame.tasks) frame.tasks = [];
+          frame.tasks.push(taskCopy);
+        }
       } else {
         taskCopy.x = canvasPos.x;
         taskCopy.y = canvasPos.y;
@@ -526,9 +532,8 @@ export default function usePlannerState(initialData) {
         name: taskData.name || 'New Task',
         type: taskData.type || 'script',
         status: taskData.status || 'planned',
-        timeLogs: taskData.time
-          ? [{ id: 'tl-' + Date.now(), duration: taskData.time, month: curMk }]
-          : [],
+        time: taskData.time || null,
+        timeLogs: [],
         description: taskData.description || '',
         sprint: null,
         completedAt: null,
