@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import { createSampleMilestones } from '../plannerData';
 import {
   getAllLeaves,
@@ -10,18 +10,32 @@ import {
   monthKey,
   parseTime,
   formatTime,
+  getTaskExpectedTime,
+  getTaskLoggedTime,
   snapToGrid,
 } from '../plannerHelpers';
 
-export default function usePlannerState() {
-  const [milestones, setMilestones] = useState(() => createSampleMilestones());
-  const [activeMilestoneIdx, setActiveMilestoneIdx] = useState(0);
+export default function usePlannerState(initialData) {
+  const [milestones, setMilestones] = useState(
+    () => (initialData && initialData.milestones) || createSampleMilestones()
+  );
+  const [activeMilestoneIdx, setActiveMilestoneIdx] = useState(
+    () => (initialData && initialData.activeMilestoneIdx) || 0
+  );
   const [boardMonth, setBoardMonth] = useState({ year: 2026, month: 3 });
   const [currentBoardId, setCurrentBoardId] = useState(null);
   const [currentBoardPath, setCurrentBoardPath] = useState(null);
   const [isSprintOverview, setIsSprintOverview] = useState(false);
   const [msCollapsed, setMsCollapsed] = useState(false);
-  const [taskOrder, setTaskOrder] = useState({});
+  const [isMetricsView, setIsMetricsView] = useState(false);
+  const [taskOrder, setTaskOrder] = useState(
+    () => (initialData && initialData.taskOrder) || {}
+  );
+
+  /* ─── Undo / Redo history ─── */
+  const MAX_HISTORY = 50;
+  const undoStack = useRef([]);
+  const redoStack = useRef([]);
 
   /* ─── Derived ─── */
   const activeMilestone = milestones[activeMilestoneIdx];
@@ -38,32 +52,59 @@ export default function usePlannerState() {
     const completed = allLeaves.filter((l) => l.completedAt === mk).length;
     const inProgress = allLeaves.filter((l) => l.sprint === mk && l.status === 'progress').length;
     let timeEst = 0;
-    allLeaves.filter((l) => l.sprint === mk).forEach((l) => { timeEst += parseTime(l.time); });
-    return { assigned, completed, inProgress, timeEst: formatTime(timeEst) };
+    let timeLogged = 0;
+    allLeaves.filter((l) => l.sprint === mk).forEach((l) => {
+      timeEst += getTaskExpectedTime(l);
+      timeLogged += getTaskLoggedTime(l);
+    });
+    return { assigned, completed, inProgress, timeEst: formatTime(timeEst), timeLogged: formatTime(timeLogged) };
   }, [allLeaves, mk]);
 
   const totalStats = useMemo(() => {
     const done = allLeaves.filter((l) => l.status === 'done').length;
     const total = allLeaves.length;
     const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-    let totalTime = 0;
-    let doneTime = 0;
+    let expectedTime = 0;
+    let loggedTime = 0;
     allLeaves.forEach((l) => {
-      totalTime += parseTime(l.time);
-      if (l.status === 'done') doneTime += parseTime(l.time);
+      expectedTime += getTaskExpectedTime(l);
+      loggedTime += getTaskLoggedTime(l);
     });
-    return { done, total, pct, totalTime: formatTime(totalTime), doneTime: formatTime(doneTime) };
+    return { done, total, pct, totalTime: formatTime(expectedTime), loggedTime: formatTime(loggedTime) };
   }, [allLeaves]);
 
   const showBreadcrumb = !isSprintOverview && !currentBoardId;
   const showBoard = isSprintOverview || !!currentBoardId;
 
-  /* ─── Helpers to clone & update milestones ─── */
+  /* ─── Helpers to clone & update milestones (with undo history) ─── */
   const updateMilestones = useCallback((updater) => {
     setMilestones((prev) => {
+      // Push current state onto undo stack
+      undoStack.current.push(JSON.stringify(prev));
+      if (undoStack.current.length > MAX_HISTORY) undoStack.current.shift();
+      // Clear redo stack on new action
+      redoStack.current = [];
       const clone = JSON.parse(JSON.stringify(prev));
       updater(clone);
       return clone;
+    });
+  }, []);
+
+  const undo = useCallback(() => {
+    if (undoStack.current.length === 0) return;
+    setMilestones((prev) => {
+      redoStack.current.push(JSON.stringify(prev));
+      const restored = JSON.parse(undoStack.current.pop());
+      return restored;
+    });
+  }, []);
+
+  const redo = useCallback(() => {
+    if (redoStack.current.length === 0) return;
+    setMilestones((prev) => {
+      undoStack.current.push(JSON.stringify(prev));
+      const restored = JSON.parse(redoStack.current.pop());
+      return restored;
     });
   }, []);
 
@@ -73,6 +114,7 @@ export default function usePlannerState() {
     setCurrentBoardId(null);
     setCurrentBoardPath(null);
     setIsSprintOverview(false);
+    setIsMetricsView(false);
   }, []);
 
   const changeSidebarMonth = useCallback((dir) => {
@@ -90,12 +132,14 @@ export default function usePlannerState() {
   }, []);
 
   const openBoard = useCallback((nodeId, displayName) => {
+    setIsMetricsView(false);
     setIsSprintOverview(false);
     setCurrentBoardId(nodeId);
     setCurrentBoardPath(displayName);
   }, []);
 
   const openSprintOverview = useCallback(() => {
+    setIsMetricsView(false);
     setIsSprintOverview((prev) => {
       if (prev) {
         setCurrentBoardId(null);
@@ -112,6 +156,95 @@ export default function usePlannerState() {
     setCurrentBoardPath(null);
     setIsSprintOverview(false);
   }, []);
+
+  const openMetrics = useCallback(() => {
+    setIsMetricsView((prev) => {
+      if (prev) return false;
+      setCurrentBoardId(null);
+      setCurrentBoardPath(null);
+      setIsSprintOverview(false);
+      return true;
+    });
+  }, []);
+
+  const closeMetrics = useCallback(() => {
+    setIsMetricsView(false);
+  }, []);
+
+  /* ─── Milestone CRUD ─── */
+  const createMilestone = useCallback((name) => {
+    setMilestones((prev) => {
+      undoStack.current.push(JSON.stringify(prev));
+      if (undoStack.current.length > MAX_HISTORY) undoStack.current.shift();
+      redoStack.current = [];
+      const clone = JSON.parse(JSON.stringify(prev));
+      clone.push({
+        id: 'ms-' + Date.now(),
+        name: name || 'New Milestone',
+        looseSystems: [],
+        looseTasks: [],
+        arrows: [],
+        frames: [],
+      });
+      return clone;
+    });
+    setActiveMilestoneIdx((prev) => prev); // stay on current
+  }, []);
+
+  const renameMilestone = useCallback((msId, newName) => {
+    updateMilestones((ms) => {
+      const m = ms.find((x) => x.id === msId);
+      if (m) m.name = newName;
+    });
+  }, [updateMilestones]);
+
+  const moveMilestone = useCallback((msId, direction) => {
+    setMilestones((prev) => {
+      const idx = prev.findIndex((x) => x.id === msId);
+      if (idx < 0) return prev;
+      const newIdx = idx + direction;
+      if (newIdx < 0 || newIdx >= prev.length) return prev;
+      undoStack.current.push(JSON.stringify(prev));
+      if (undoStack.current.length > MAX_HISTORY) undoStack.current.shift();
+      redoStack.current = [];
+      const clone = JSON.parse(JSON.stringify(prev));
+      const temp = clone[idx];
+      clone[idx] = clone[newIdx];
+      clone[newIdx] = temp;
+      return clone;
+    });
+    // Adjust active index to follow the milestone the user is viewing
+    setActiveMilestoneIdx((prev) => {
+      const idx = milestones.findIndex((x) => x.id === msId);
+      if (idx < 0) return prev;
+      const newIdx = idx + direction;
+      if (newIdx < 0 || newIdx >= milestones.length) return prev;
+      if (prev === idx) return newIdx;
+      if (prev === newIdx) return idx;
+      return prev;
+    });
+  }, [milestones]);
+
+  const deleteMilestone = useCallback((msId) => {
+    setMilestones((prev) => {
+      if (prev.length <= 1) return prev; // can't delete last
+      const idx = prev.findIndex((x) => x.id === msId);
+      if (idx < 0) return prev;
+      undoStack.current.push(JSON.stringify(prev));
+      if (undoStack.current.length > MAX_HISTORY) undoStack.current.shift();
+      redoStack.current = [];
+      const clone = JSON.parse(JSON.stringify(prev));
+      clone.splice(idx, 1);
+      return clone;
+    });
+    setActiveMilestoneIdx((prev) => {
+      const newLen = milestones.length - 1;
+      return prev >= newLen ? Math.max(0, newLen - 1) : prev;
+    });
+    setCurrentBoardId(null);
+    setCurrentBoardPath(null);
+    setIsSprintOverview(false);
+  }, [milestones]);
 
   /* ─── Canvas mutations ─── */
   const moveFrame = useCallback((frameId, dx, dy) => {
@@ -136,6 +269,11 @@ export default function usePlannerState() {
 
       const sysCopy = JSON.parse(JSON.stringify(sysNode));
       removeSystemFromAny(sysId, milestone);
+
+      // Clean up empty standalone frames left behind
+      milestone.frames = milestone.frames.filter(
+        (f) => !f.standalone || f.systems.length > 0
+      );
 
       if (target && target.type === 'frame') {
         const targetFrame = milestone.frames.find((f) => f.id === target.id);
@@ -203,7 +341,8 @@ export default function usePlannerState() {
         name: 'New Task',
         type: 'script',
         status: 'planned',
-        time: null,
+        timeLogs: [],
+        description: '',
         sprint: null,
         completedAt: null,
         x: snapToGrid(x),
@@ -289,7 +428,10 @@ export default function usePlannerState() {
       if (!task) return;
       if (updates.name !== undefined) task.name = updates.name;
       if (updates.type !== undefined) task.type = updates.type;
+      if (updates.description !== undefined) task.description = updates.description;
+      if (updates.timeLogs !== undefined) task.timeLogs = updates.timeLogs;
       if (updates.time !== undefined) task.time = updates.time || null;
+      if (updates.sprint !== undefined) task.sprint = updates.sprint || null;
       if (updates.status !== undefined) {
         task.status = updates.status;
         if (updates.status === 'done') {
@@ -378,17 +520,21 @@ export default function usePlannerState() {
       const parent = findTask(parentSysId, ms[activeMilestoneIdx]);
       if (!parent) return;
       if (!parent.children) parent.children = [];
+      const curMk = monthKey(boardMonth.year, boardMonth.month);
       parent.children.push({
         id: 'task-' + Date.now(),
         name: taskData.name || 'New Task',
         type: taskData.type || 'script',
         status: taskData.status || 'planned',
-        time: taskData.time || null,
+        timeLogs: taskData.time
+          ? [{ id: 'tl-' + Date.now(), duration: taskData.time, month: curMk }]
+          : [],
+        description: taskData.description || '',
         sprint: null,
         completedAt: null,
       });
     });
-  }, [activeMilestoneIdx, updateMilestones]);
+  }, [activeMilestoneIdx, boardMonth, updateMilestones]);
 
   /* ─── Arrow actions ─── */
   const addArrow = useCallback((fromId, toId) => {
@@ -448,6 +594,7 @@ export default function usePlannerState() {
     currentBoardId,
     currentBoardPath,
     isSprintOverview,
+    isMetricsView,
     msCollapsed,
     taskOrder,
     allLeaves,
@@ -456,6 +603,14 @@ export default function usePlannerState() {
     totalStats,
     showBreadcrumb,
     showBoard,
+    // Undo / Redo
+    undo,
+    redo,
+    // Milestone CRUD
+    createMilestone,
+    renameMilestone,
+    deleteMilestone,
+    moveMilestone,
     // Actions
     switchMilestone,
     changeSidebarMonth,
@@ -463,6 +618,8 @@ export default function usePlannerState() {
     openBoard,
     openSprintOverview,
     closeBoard,
+    openMetrics,
+    closeMetrics,
     moveFrame,
     dropSystem,
     dropTask,

@@ -40,9 +40,31 @@ export function getProgress(node) {
 /* ─── Time helpers ─── */
 export function parseTime(t) {
   if (!t) return 0;
-  if (t.indexOf('h') > -1) return parseFloat(t) * 60;
-  if (t.indexOf('m') > -1) return parseFloat(t);
-  return 0;
+  let mins = 0;
+  const hMatch = t.toString().match(/(\d+(?:\.\d+)?)\s*h/i);
+  const mMatch = t.toString().match(/(\d+(?:\.\d+)?)\s*m/i);
+  if (hMatch) mins += parseFloat(hMatch[1]) * 60;
+  if (mMatch) mins += parseFloat(mMatch[1]);
+  if (mins === 0 && /^\d+(\.\d+)?$/.test(String(t).trim())) mins = parseFloat(t);
+  return mins;
+}
+
+/** Expected time for a task (the estimate in task.time) */
+export function getTaskExpectedTime(task) {
+  return parseTime(task.time);
+}
+
+/** Logged time for a task (sum of timeLogs entries) */
+export function getTaskLoggedTime(task) {
+  if (!task.timeLogs || task.timeLogs.length === 0) return 0;
+  let total = 0;
+  task.timeLogs.forEach((log) => { total += parseTime(log.duration); });
+  return total;
+}
+
+/** Backward compat alias — returns expected time */
+export function getTaskTime(task) {
+  return parseTime(task.time);
 }
 
 export function formatTime(minutes) {
@@ -54,26 +76,42 @@ export function formatTime(minutes) {
   return minutes + 'm';
 }
 
+/** Sum of expected times for all leaves under a node */
 export function getTotalTime(node) {
   const leaves = getLeaves(node);
   let total = 0;
-  leaves.forEach((x) => { total += parseTime(x.time); });
+  leaves.forEach((x) => { total += getTaskExpectedTime(x); });
   return total;
 }
 
-export function getDoneTime(node) {
+/** Sum of logged times for all leaves under a node */
+export function getLoggedTime(node) {
   const leaves = getLeaves(node);
   let total = 0;
-  leaves.forEach((x) => {
-    if (x.status === 'done') total += parseTime(x.time);
-  });
+  leaves.forEach((x) => { total += getTaskLoggedTime(x); });
+  return total;
+}
+
+/** Milestone-level: sum of expected times */
+export function getMilestoneTotalTime(ms) {
+  const leaves = getAllLeaves(ms);
+  let total = 0;
+  leaves.forEach((x) => { total += getTaskExpectedTime(x); });
+  return total;
+}
+
+/** Milestone-level: sum of logged times */
+export function getMilestoneLoggedTime(ms) {
+  const leaves = getAllLeaves(ms);
+  let total = 0;
+  leaves.forEach((x) => { total += getTaskLoggedTime(x); });
   return total;
 }
 
 /* ─── Visual helpers ─── */
 export function getProgressColor(pct) {
   if (pct === 100) return '#34a853';
-  if (pct >= 50) return '#8ab4f8';
+  if (pct >= 50) return '#E8985A';
   if (pct > 0) return '#fbbc04';
   return '#5f6368';
 }
@@ -96,6 +134,12 @@ export function snapToGrid(val, gridSize = GRID_SIZE) {
 export function getFrameTotalTime(frame) {
   let total = 0;
   (frame.systems || []).forEach((sys) => { total += getTotalTime(sys); });
+  return total;
+}
+
+export function getFrameLoggedTime(frame) {
+  let total = 0;
+  (frame.systems || []).forEach((sys) => { total += getLoggedTime(sys); });
   return total;
 }
 

@@ -1,35 +1,34 @@
 import React from 'react';
-import { MONTH_NAMES, STATUS_COLORS } from '../plannerData';
-import { iconFor, sprintShort } from '../plannerHelpers';
+import { STATUS_COLORS } from '../plannerData';
+import { iconFor, sprintShort, getTaskExpectedTime, getTaskLoggedTime, formatTime } from '../plannerHelpers';
 
 export default function KanbanCard({
   task,
   systemName,
   parentName,
   showSystem,
-  mk,
-  boardMonth,
   onDragStart,
   onDragEnd,
-  onAssign,
-  onUnassign,
   onOpenModal,
   onDeleteTask,
 }) {
-  const isAssigned = task.sprint === mk;
+  const expectedMins = getTaskExpectedTime(task);
+  const loggedMins = getTaskLoggedTime(task);
+  const statusCls = 'status-' + (task.status || 'planned');
 
-  const handleContextMenu = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const openEdit = (e) => {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
     if (onOpenModal) {
       onOpenModal({
         type: 'edit-task',
-        title: 'Edit Task',
         targetId: task.id,
         fields: [
           { key: 'name', label: 'Name', type: 'text', value: task.name || '' },
-          { key: 'time', label: 'Expected Time', type: 'text', value: task.time || '', placeholder: 'e.g. 2h, 30m' },
+          { key: 'description', label: 'Description', type: 'textarea', value: task.description || '' },
+          { key: 'sprint', label: 'Sprint', type: 'sprint-select', value: task.sprint || '' },
           { key: 'type', label: 'Icon Type', type: 'icon-select', value: task.type || 'script' },
+          { key: 'time', label: 'Expected Time', type: 'text', value: task.time || '', placeholder: 'e.g. 2h, 30m' },
+          { key: 'timeLogs', label: 'Time Logs', type: 'time-logs', value: task.timeLogs || [] },
           { key: 'status', label: 'Status', type: 'status-select', value: task.status || 'planned' },
         ],
       });
@@ -43,12 +42,12 @@ export default function KanbanCard({
 
   return (
     <div
-      className="kanban-card"
+      className={`kanban-card${task.status === 'done' ? ' kanban-card-done' : ''}`}
       draggable
       data-task-id={task.id}
       onDragStart={(e) => onDragStart(e, task.id)}
       onDragEnd={onDragEnd}
-      onContextMenu={handleContextMenu}
+      onContextMenu={openEdit}
     >
       <div
         className="kanban-card-status-bar"
@@ -58,28 +57,25 @@ export default function KanbanCard({
         <div className="kanban-card-top">
           <img className="kanban-card-icon" src={iconFor(task.type)} alt={task.type} />
           <div className="kanban-card-name">{task.name}</div>
+          <div className="kanban-card-btns">
+            <button className="kc-btn" onClick={openEdit} title="Edit">&#9998;</button>
+            <button className="kc-btn kc-del" onClick={handleDelete} title="Delete">&#128465;</button>
+          </div>
         </div>
+        {task.description && (
+          <div className="kanban-card-desc">{task.description}</div>
+        )}
         <div className="kanban-card-meta">
           {showSystem && systemName && (
             <span className="kanban-card-system">{systemName}</span>
           )}
           {parentName && <span className="kanban-card-parent">{parentName}</span>}
-          {task.time && <span className="kanban-card-time">{task.time}</span>}
-          {task.sprint && <span>{sprintShort(task.sprint)}</span>}
-        </div>
-        <div className="kanban-card-actions">
-          {!isAssigned ? (
-            <button className="assign-btn" onClick={(e) => { e.stopPropagation(); onAssign(task.id); }}>
-              + {MONTH_NAMES[boardMonth.month]}
-            </button>
-          ) : (
-            <button className="assign-btn assigned" onClick={(e) => { e.stopPropagation(); onUnassign(task.id); }}>
-              &#10003; {MONTH_NAMES[boardMonth.month]}
-            </button>
+          {expectedMins > 0 && (
+            <span className={`kanban-card-time ${statusCls}`}>
+              {formatTime(loggedMins)}/{formatTime(expectedMins)}
+            </span>
           )}
-          <button className="assign-btn delete-btn" onClick={handleDelete} title="Delete task">
-            &#128465;
-          </button>
+          {task.sprint && <span className={`kanban-card-sprint ${statusCls}`}>{sprintShort(task.sprint)}</span>}
         </div>
       </div>
     </div>

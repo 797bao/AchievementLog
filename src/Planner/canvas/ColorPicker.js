@@ -1,26 +1,28 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { DEFAULT_COLOR_PALETTE } from '../plannerData';
+import { ref, get, set } from 'firebase/database';
+import { database } from '../../firebase';
 
-const STORAGE_KEY = 'planner-fav-colors';
+const FAV_PATH = 'planner/favoriteColors';
 
-function loadFavorites() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
-}
-
-function saveFavorites(favs) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(favs));
-}
-
-export default function ColorPicker({ label, value, onChange, defaultValue, onClose }) {
-  const [hex, setHex] = useState(value || '#4285f4');
-  const [favorites, setFavorites] = useState(loadFavorites);
+export default function ColorPicker({ label, value, onChange, defaultValue }) {
+  const [hex, setHex] = useState(value || '#E8985A');
+  const [favorites, setFavorites] = useState([]);
 
   useEffect(() => {
     if (value) setHex(value);
   }, [value]);
+
+  // Load favorites from Firebase on mount
+  useEffect(() => {
+    get(ref(database, FAV_PATH))
+      .then((snap) => {
+        if (snap.exists()) {
+          const val = snap.val();
+          setFavorites(Array.isArray(val) ? val : Object.values(val));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handleSelect = useCallback((color) => {
     setHex(color);
@@ -37,7 +39,7 @@ export default function ColorPicker({ label, value, onChange, defaultValue, onCl
 
   const handleHexBlur = useCallback(() => {
     if (!/^#[0-9a-fA-F]{6}$/.test(hex)) {
-      setHex(value || '#4285f4');
+      setHex(value || '#E8985A');
     }
   }, [hex, value]);
 
@@ -45,31 +47,29 @@ export default function ColorPicker({ label, value, onChange, defaultValue, onCl
     if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return;
     const updated = [...favorites.filter((f) => f !== hex), hex];
     setFavorites(updated);
-    saveFavorites(updated);
+    set(ref(database, FAV_PATH), updated).catch(() => {});
   }, [hex, favorites]);
 
   const removeFavorite = useCallback((color) => {
     const updated = favorites.filter((f) => f !== color);
     setFavorites(updated);
-    saveFavorites(updated);
+    set(ref(database, FAV_PATH), updated.length > 0 ? updated : null).catch(() => {});
   }, [favorites]);
 
   const handleReset = useCallback(() => {
     const def = defaultValue || '';
-    setHex(def || '#4285f4');
+    setHex(def || '#E8985A');
     onChange(def);
   }, [defaultValue, onChange]);
 
-  // Prevent mousedown from bubbling to the outside-click handler
   const stopMouse = useCallback((e) => {
     e.stopPropagation();
   }, []);
 
   return (
-    <div className="color-picker-popover" onMouseDown={stopMouse} onClick={(e) => e.stopPropagation()}>
+    <div className="color-picker-popover cp-compact" onMouseDown={stopMouse} onClick={(e) => e.stopPropagation()}>
       {label && <div className="cp-label">{label}</div>}
 
-      {/* Current color + hex input */}
       <div className="cp-input-row">
         <div className="cp-preview" style={{ background: hex }} />
         <input
@@ -84,46 +84,25 @@ export default function ColorPicker({ label, value, onChange, defaultValue, onCl
         <button className="cp-fav-btn" onClick={addFavorite} title="Add to favorites">
           &#9733;
         </button>
-      </div>
-
-      {/* Default / None option */}
-      <div className="cp-reset-row">
-        <button className="cp-reset-btn" onClick={handleReset}>
-          &#10006; None / Default
+        <button className="cp-reset-btn-sm" onClick={handleReset} title="Reset to default">
+          &#10006;
         </button>
       </div>
 
-      {/* Preset palette */}
-      <div className="cp-section-label">Palette</div>
-      <div className="cp-swatch-grid">
-        {DEFAULT_COLOR_PALETTE.map((c) => (
-          <div
-            key={c}
-            className={`cp-swatch${c === hex ? ' active' : ''}`}
-            style={{ background: c }}
-            onClick={() => handleSelect(c)}
-            title={c}
-          />
-        ))}
-      </div>
-
-      {/* Favorites */}
+      {/* Favorites (blank by default, user builds this palette) */}
       {favorites.length > 0 && (
-        <>
-          <div className="cp-section-label">Favorites</div>
-          <div className="cp-swatch-grid">
-            {favorites.map((c) => (
-              <div
-                key={c}
-                className={`cp-swatch fav${c === hex ? ' active' : ''}`}
-                style={{ background: c }}
-                onClick={() => handleSelect(c)}
-                onContextMenu={(e) => { e.preventDefault(); removeFavorite(c); }}
-                title={`${c} (right-click to remove)`}
-              />
-            ))}
-          </div>
-        </>
+        <div className="cp-swatch-grid">
+          {favorites.map((c) => (
+            <div
+              key={c}
+              className={`cp-swatch fav${c === hex ? ' active' : ''}`}
+              style={{ background: c }}
+              onClick={() => handleSelect(c)}
+              onContextMenu={(e) => { e.preventDefault(); removeFavorite(c); }}
+              title={`${c} (right-click to remove)`}
+            />
+          ))}
+        </div>
       )}
     </div>
   );

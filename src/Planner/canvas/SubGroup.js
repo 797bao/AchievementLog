@@ -1,17 +1,18 @@
 import React from 'react';
 import TaskItem from './TaskItem';
-import { getProgress, getProgressClass, getTotalTime, formatTime } from '../plannerHelpers';
+import { getProgress, getProgressClass, getTotalTime, getLoggedTime, formatTime } from '../plannerHelpers';
 
 export default function SubGroup({ group }) {
   const prog = getProgress(group);
   const progClass = getProgressClass(prog.pct);
-  const totalT = getTotalTime(group);
+  const expectedT = getTotalTime(group);
+  const loggedT = getLoggedTime(group);
 
   return (
-    <div className="sub-group" data-sys-id={group.id}>
+    <div className={`sub-group${prog.pct === 100 ? ' group-done' : ''}`} data-sys-id={group.id}>
       <div className="sub-group-header">
         <div className="sub-group-name">{group.name}</div>
-        <span className="sub-group-time">{formatTime(totalT)}</span>
+        <span className="sub-group-time">{formatTime(loggedT)}/{formatTime(expectedT)}</span>
         <div className={`sub-group-badge ${progClass}`}>
           {prog.done}/{prog.total}
         </div>

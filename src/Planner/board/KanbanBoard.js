@@ -6,14 +6,10 @@ import useKanbanDragDrop from '../hooks/useKanbanDragDrop';
 export default function KanbanBoard({
   items,
   showSystem,
-  mk,
-  boardMonth,
   boardKey,
   taskOrder,
   onStatusChange,
   onUpdateTaskOrder,
-  onAssign,
-  onUnassign,
   getSystemName,
   getParentName,
   onOpenModal,
@@ -52,15 +48,11 @@ export default function KanbanBoard({
           status={status}
           items={getItemsForStatus(status)}
           showSystem={showSystem}
-          mk={mk}
-          boardMonth={boardMonth}
           onDragStart={onDragStart}
           onDragEnd={onDragEnd}
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
           onDrop={onDrop}
-          onAssign={onAssign}
-          onUnassign={onUnassign}
           getSystemName={getSystemName}
           getParentName={getParentName}
           onOpenModal={onOpenModal}

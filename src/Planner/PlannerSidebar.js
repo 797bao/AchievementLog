@@ -1,5 +1,12 @@
-import React from 'react';
-import { getAllLeaves, getProgressColor, monthLabel } from './plannerHelpers';
+import React, { useState, useEffect } from 'react';
+import {
+  getAllLeaves,
+  getProgressColor,
+  monthLabel,
+  getMilestoneTotalTime,
+  getMilestoneLoggedTime,
+  formatTime,
+} from './plannerHelpers';
 
 export default function PlannerSidebar({
   milestones,
@@ -7,12 +14,28 @@ export default function PlannerSidebar({
   boardMonth,
   sprintStats,
   isSprintOverview,
+  isMetricsView,
   msCollapsed,
   onSwitchMilestone,
   onChangeSidebarMonth,
   onOpenSprintOverview,
+  onOpenMetrics,
   onToggleMilestones,
+  onCreateMilestone,
+  onRenameMilestone,
+  onDeleteMilestone,
+  onMoveMilestone,
 }) {
+  const [msCtxMenu, setMsCtxMenu] = useState(null);
+
+  // Close milestone context menu on outside click
+  useEffect(() => {
+    if (!msCtxMenu) return;
+    const handler = () => setMsCtxMenu(null);
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, [msCtxMenu]);
+
   return (
     <div className="planner-sidebar">
       {/* Sprint section */}
@@ -43,8 +66,8 @@ export default function PlannerSidebar({
             <span className="sval">{sprintStats.inProgress}</span>
           </div>
           <div className="sprint-stat-row">
-            <span>Time est.</span>
-            <span className="sval">{sprintStats.timeEst}</span>
+            <span>Time</span>
+            <span className="sval">{sprintStats.timeLogged} / {sprintStats.timeEst}</span>
           </div>
         </div>
         <button
@@ -55,13 +78,30 @@ export default function PlannerSidebar({
         </button>
       </div>
 
+      {/* Metrics section */}
+      <div className="sb-section">
+        <button
+          className={`sprint-board-btn metrics-btn${isMetricsView ? ' active' : ''}`}
+          onClick={onOpenMetrics}
+        >
+          {isMetricsView ? '\u2713 Metrics Open' : '\u2630 Metrics'}
+        </button>
+      </div>
+
       {/* Milestones section */}
       <div className="sb-section">
         <div className="ms-header" onClick={onToggleMilestones}>
           <span className={`ms-toggle${msCollapsed ? ' collapsed' : ''}`}>&#9660;</span>
-          <div className="sb-section-title" style={{ margin: 0 }}>
+          <div className="sb-section-title" style={{ margin: 0, flex: 1 }}>
             Milestones
           </div>
+          <button
+            className="ms-add-btn"
+            onClick={(e) => { e.stopPropagation(); onCreateMilestone(); }}
+            title="New Milestone"
+          >
+            +
+          </button>
         </div>
         <div className={`ms-list${msCollapsed ? ' collapsed' : ''}`}>
           {milestones.map((m, idx) => {
@@ -69,16 +109,23 @@ export default function PlannerSidebar({
             const done = leaves.filter((l) => l.status === 'done').length;
             const pct = leaves.length > 0 ? Math.round((done / leaves.length) * 100) : 0;
             const isActive = idx === activeMilestoneIdx;
+            const totalT = getMilestoneTotalTime(m);
+            const loggedT = getMilestoneLoggedTime(m);
 
             return (
               <div
                 key={m.id}
                 className={`ms-item${isActive ? ' active' : ''}`}
                 onClick={() => onSwitchMilestone(idx)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setMsCtxMenu({ msId: m.id, msName: m.name, x: e.clientX, y: e.clientY });
+                }}
               >
                 <div className="ms-item-info">
                   <div className="ms-item-name">
-                    MS{idx + 1}: {m.name.replace(/Milestone \d+: /, '')}
+                    {m.name}
                   </div>
                   <div className="ms-item-bar">
                     <div
@@ -86,6 +133,11 @@ export default function PlannerSidebar({
                       style={{ width: `${pct}%`, background: getProgressColor(pct) }}
                     />
                   </div>
+                  {totalT > 0 && (
+                    <div className="ms-item-time">
+                      {formatTime(loggedT)} / {formatTime(totalT)}
+                    </div>
+                  )}
                 </div>
                 <div className="ms-item-pct">{pct}%</div>
               </div>
@@ -93,6 +145,54 @@ export default function PlannerSidebar({
           })}
         </div>
       </div>
+
+      {/* Milestone context menu */}
+      {msCtxMenu && (
+        <div
+          className="ms-ctx-menu"
+          style={{ left: msCtxMenu.x, top: msCtxMenu.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div
+            className="ms-ctx-item"
+            onClick={() => {
+              onMoveMilestone(msCtxMenu.msId, -1);
+              setMsCtxMenu(null);
+            }}
+          >
+            &#9650; Move Up
+          </div>
+          <div
+            className="ms-ctx-item"
+            onClick={() => {
+              onMoveMilestone(msCtxMenu.msId, 1);
+              setMsCtxMenu(null);
+            }}
+          >
+            &#9660; Move Down
+          </div>
+          <div
+            className="ms-ctx-item"
+            onClick={() => {
+              onRenameMilestone(msCtxMenu.msId, msCtxMenu.msName);
+              setMsCtxMenu(null);
+            }}
+          >
+            &#9998; Rename
+          </div>
+          {milestones.length > 1 && (
+            <div
+              className="ms-ctx-item ms-ctx-danger"
+              onClick={() => {
+                onDeleteMilestone(msCtxMenu.msId, msCtxMenu.msName);
+                setMsCtxMenu(null);
+              }}
+            >
+              &#128465; Delete
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

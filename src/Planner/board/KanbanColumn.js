@@ -6,15 +6,11 @@ export default function KanbanColumn({
   status,
   items,
   showSystem,
-  mk,
-  boardMonth,
   onDragStart,
   onDragEnd,
   onDragOver,
   onDragLeave,
   onDrop,
-  onAssign,
-  onUnassign,
   getSystemName,
   getParentName,
   onOpenModal,
@@ -42,12 +38,8 @@ export default function KanbanColumn({
             systemName={getSystemName ? getSystemName(item.id) : ''}
             parentName={getParentName ? getParentName(item.id) : ''}
             showSystem={showSystem}
-            mk={mk}
-            boardMonth={boardMonth}
             onDragStart={onDragStart}
             onDragEnd={onDragEnd}
-            onAssign={onAssign}
-            onUnassign={onUnassign}
             onOpenModal={onOpenModal}
             onDeleteTask={onDeleteTask}
           />

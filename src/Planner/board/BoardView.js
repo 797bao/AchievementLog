@@ -5,12 +5,13 @@ import {
   getLeaves,
   getProgress,
   getTotalTime,
-  getDoneTime,
+  getLoggedTime,
   formatTime,
   findTask,
   findSystemForTask,
   findParentName,
-  parseTime,
+  getTaskExpectedTime,
+  getTaskLoggedTime,
   monthKey,
   monthLabel,
 } from '../plannerHelpers';
@@ -27,8 +28,6 @@ export default function BoardView({
   onChangeSidebarMonth,
   onStatusChange,
   onUpdateTaskOrder,
-  onAssign,
-  onUnassign,
   onOpenModal,
   onDeleteTask,
   onCreateTaskInSystem,
@@ -41,8 +40,12 @@ export default function BoardView({
     const filtered = allLeaves.filter((l) => l.sprint === mk);
     const done = filtered.filter((l) => l.status === 'done').length;
     let timeEst = 0;
-    filtered.forEach((l) => { timeEst += parseTime(l.time); });
-    return { filtered, count: filtered.length, done, timeEst: formatTime(timeEst) };
+    let timeLogged = 0;
+    filtered.forEach((l) => {
+      timeEst += getTaskExpectedTime(l);
+      timeLogged += getTaskLoggedTime(l);
+    });
+    return { filtered, count: filtered.length, done, timeEst: formatTime(timeEst), timeLogged: formatTime(timeLogged) };
   }, [isSprintOverview, milestone, mk]);
 
   const systemData = useMemo(() => {
@@ -51,9 +54,9 @@ export default function BoardView({
     if (!node) return null;
     const allLeaves = getLeaves(node);
     const prog = getProgress(node);
-    const totalT = getTotalTime(node);
-    const doneT = getDoneTime(node);
-    return { node, allLeaves, prog, totalT: formatTime(totalT), doneT: formatTime(doneT) };
+    const expectedT = getTotalTime(node);
+    const loggedT = getLoggedTime(node);
+    return { node, allLeaves, prog, expectedT: formatTime(expectedT), loggedT: formatTime(loggedT) };
   }, [currentBoardId, milestone]);
 
   const boardKey = isSprintOverview
@@ -80,6 +83,7 @@ export default function BoardView({
         targetId: currentBoardId,
         fields: [
           { key: 'name', label: 'Name', type: 'text', value: '', placeholder: 'Task name' },
+          { key: 'description', label: 'Description', type: 'textarea', value: '' },
           { key: 'time', label: 'Expected Time', type: 'text', value: '', placeholder: 'e.g. 2h, 30m' },
           { key: 'type', label: 'Icon Type', type: 'icon-select', value: 'script' },
           { key: 'status', label: 'Status', type: 'status-select', value: 'planned' },
@@ -104,7 +108,7 @@ export default function BoardView({
           <div className="board-stats">
             <span className="val">{sprintData.count}</span> assigned &middot;{' '}
             <span className="val">{sprintData.done}</span> completed &middot;{' '}
-            <span className="val">{sprintData.timeEst}</span> est.
+            <span className="val">{sprintData.timeLogged}</span> / {sprintData.timeEst}
           </div>
           <div className="board-month-nav">
             <button className="bm-btn" onClick={() => onChangeSidebarMonth(-1)}>&#9664;</button>
@@ -113,9 +117,8 @@ export default function BoardView({
           </div>
           <KanbanBoard
             items={sprintData.filtered} showSystem={true}
-            mk={mk} boardMonth={boardMonth} boardKey={boardKey} taskOrder={taskOrder}
+            boardKey={boardKey} taskOrder={taskOrder}
             onStatusChange={onStatusChange} onUpdateTaskOrder={onUpdateTaskOrder}
-            onAssign={onAssign} onUnassign={onUnassign}
             getSystemName={getSystemName} getParentName={() => ''}
             onOpenModal={onOpenModal} onDeleteTask={onDeleteTask}
           />
@@ -132,13 +135,12 @@ export default function BoardView({
           <div className="board-stats">
             <span className="val">{systemData.prog.done}/{systemData.prog.total}</span> tasks &middot;{' '}
             <span className="val">{systemData.prog.pct}%</span> &middot;{' '}
-            <span className="val">{systemData.doneT}</span>/{systemData.totalT}
+            <span className="val">{systemData.loggedT}</span>/{systemData.expectedT}
           </div>
           <KanbanBoard
             items={systemData.allLeaves} showSystem={false}
-            mk={mk} boardMonth={boardMonth} boardKey={boardKey} taskOrder={taskOrder}
+            boardKey={boardKey} taskOrder={taskOrder}
             onStatusChange={onStatusChange} onUpdateTaskOrder={onUpdateTaskOrder}
-            onAssign={onAssign} onUnassign={onUnassign}
             getSystemName={() => ''} getParentName={getParentNameForTask}
             onOpenModal={onOpenModal} onDeleteTask={onDeleteTask}
           />

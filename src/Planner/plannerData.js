@@ -36,7 +36,7 @@ export const GRID_SIZE = 20;
 
 export const STATUS_COLORS = {
   planned: '#9aa0a6',
-  progress: '#4285f4',
+  progress: '#D7681F',
   testing: '#fbbc04',
   done: '#34a853',
 };
@@ -49,8 +49,23 @@ export const DEFAULT_COLOR_PALETTE = [
   '#c58af9', '#78d9ec', '#fcad70', '#bcaaa4',
 ];
 
-/* ─── Sample milestone data ─── */
+/* ─── Blank starting state ─── */
 export function createSampleMilestones() {
+  return [
+    {
+      id: 'ms-' + Date.now(),
+      name: 'Milestone 1',
+      looseSystems: [],
+      looseTasks: [],
+      arrows: [],
+      frames: [],
+    },
+  ];
+}
+
+/* ─── Sample milestone data (commented out — restore if needed) ─── */
+/*
+export function _createSampleMilestones() {
   return [
     {
       id: 'ms1',
@@ -478,3 +493,4 @@ export function createSampleMilestones() {
     },
   ];
 }
+*/

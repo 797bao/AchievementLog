@@ -104,7 +104,7 @@ export default function ArrowLayer({ arrows, containerRef, onDeleteArrow, previe
         React.createElement('polygon', { points: '0 0, 10 4, 0 8', fill: '#ea4335' })
       ),
       React.createElement('marker', { id: 'arrowhead-preview', markerWidth: 10, markerHeight: 8, refX: 9, refY: 4, orient: 'auto', markerUnits: 'userSpaceOnUse' },
-        React.createElement('polygon', { points: '0 0, 10 4, 0 8', fill: '#8ab4f8' })
+        React.createElement('polygon', { points: '0 0, 10 4, 0 8', fill: '#E8985A' })
       )
     ),
     // Existing arrows
@@ -129,7 +129,7 @@ export default function ArrowLayer({ arrows, containerRef, onDeleteArrow, previe
       key: 'preview',
       x1: previewPath.x1, y1: previewPath.y1,
       x2: previewPath.x2, y2: previewPath.y2,
-      stroke: '#8ab4f8', strokeWidth: 2, strokeDasharray: '4,4',
+      stroke: '#E8985A', strokeWidth: 2, strokeDasharray: '4,4',
       markerEnd: 'url(#arrowhead-preview)', pointerEvents: 'none',
       opacity: 0.7
     })

@@ -6,15 +6,15 @@ import {
   getProgressColor,
   getProgressClass,
   getTotalTime,
-  getDoneTime,
+  getLoggedTime,
   formatTime,
 } from '../plannerHelpers';
 
 export default function SystemBox({ system, depth = 0 }) {
   const prog = getProgress(system);
   const progClass = getProgressClass(prog.pct);
-  const totalT = getTotalTime(system);
-  const doneT = getDoneTime(system);
+  const expectedT = getTotalTime(system);
+  const loggedT = getLoggedTime(system);
 
   // Separate children into groups (isGroup) and loose tasks
   const groups = (system.children || []).filter((c) => c.isGroup);
@@ -30,11 +30,11 @@ export default function SystemBox({ system, depth = 0 }) {
   if (depth > 5) return <div className="system-box-overflow">Max nesting depth</div>;
 
   return (
-    <div className="system-box" data-sys-id={system.id}>
+    <div className={`system-box${prog.pct === 100 ? ' system-done' : ''}`} data-sys-id={system.id}>
       <div className="system-box-header" style={headerStyle}>
         <div className="system-box-name" style={nameStyle}>{system.name}</div>
-        {totalT > 0 && (
-          <div className="system-box-time-pill">{formatTime(doneT)}/{formatTime(totalT)}</div>
+        {expectedT > 0 && (
+          <div className="system-box-time-pill">{formatTime(loggedT)}/{formatTime(expectedT)}</div>
         )}
         {prog.total > 0 && (
           <div className={`system-box-badge ${progClass}`}>

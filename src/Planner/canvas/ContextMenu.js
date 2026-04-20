@@ -22,12 +22,14 @@ function TaskMenu({ targetId, targetData, onOpenModal, onUpdateTaskStatus, onDel
   const handleEdit = () => {
     onOpenModal({
       type: 'edit-task',
-      title: 'Edit Task',
       targetId,
       fields: [
         { key: 'name', label: 'Name', type: 'text', value: targetData?.name || '' },
-        { key: 'time', label: 'Expected Time', type: 'text', value: targetData?.time || '', placeholder: 'e.g. 2h, 30m' },
+        { key: 'description', label: 'Description', type: 'textarea', value: targetData?.description || '' },
+        { key: 'sprint', label: 'Sprint', type: 'sprint-select', value: targetData?.sprint || '' },
         { key: 'type', label: 'Icon Type', type: 'icon-select', value: targetData?.type || 'script' },
+        { key: 'time', label: 'Expected Time', type: 'text', value: targetData?.time || '', placeholder: 'e.g. 2h, 30m' },
+        { key: 'timeLogs', label: 'Time Logs', type: 'time-logs', value: targetData?.timeLogs || [] },
         { key: 'status', label: 'Status', type: 'status-select', value: targetData?.status || 'planned' },
       ],
     });
