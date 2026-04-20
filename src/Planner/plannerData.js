@@ -32,6 +32,22 @@ export const TYPE_ICON_FILES = {
 };
 
 export const CLICK_THRESHOLD = 5;
+export const GRID_SIZE = 20;
+
+export const STATUS_COLORS = {
+  planned: '#9aa0a6',
+  progress: '#4285f4',
+  testing: '#fbbc04',
+  done: '#34a853',
+};
+
+export const DEFAULT_COLOR_PALETTE = [
+  '#4285f4', '#34a853', '#fbbc04', '#ea4335',
+  '#9c27b0', '#00bcd4', '#ff9800', '#795548',
+  '#607d8b', '#e91e63', '#3f51b5', '#009688',
+  '#8ab4f8', '#81c995', '#fdd663', '#f28b82',
+  '#c58af9', '#78d9ec', '#fcad70', '#bcaaa4',
+];
 
 /* ─── Sample milestone data ─── */
 export function createSampleMilestones() {

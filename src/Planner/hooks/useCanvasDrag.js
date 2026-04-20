@@ -1,5 +1,6 @@
 import { useRef, useCallback } from 'react';
 import { CLICK_THRESHOLD } from '../plannerData';
+import { snapToGrid } from '../plannerHelpers';
 
 export default function useCanvasDrag({ mapZoom, screenToCanvas, onDropTask, onDropSystem, onMoveFrame, onMapClick }) {
   const dragRef = useRef(null);
@@ -36,6 +37,10 @@ export default function useCanvasDrag({ mapZoom, screenToCanvas, onDropTask, onD
       if (sb && sb.dataset.sysId !== dragId) return { type: 'system', id: sb.dataset.sysId, el: sb };
     }
     if (dragType === 'system') {
+      // Allow dropping system into another system (nested)
+      const sb = el.closest('.system-box');
+      if (sb && sb.dataset.sysId !== dragId) return { type: 'system', id: sb.dataset.sysId, el: sb };
+      // Allow dropping system into a frame
       const fr = el.closest('.canvas-frame');
       if (fr) return { type: 'frame', id: fr.dataset.frameId, el: fr };
     }
@@ -64,47 +69,43 @@ export default function useCanvasDrag({ mapZoom, screenToCanvas, onDropTask, onD
     const frameDragBar = e.target.closest('.frame-drag-bar');
     const standaloneEl = e.target.closest('.standalone-node');
 
-    if (taskEl) {
-      dragRef.current = { type: 'task', id: taskEl.dataset.taskId, srcEl: taskEl, mouseX: e.clientX, mouseY: e.clientY, ghost: null, dragging: false };
-      e.preventDefault();
-      return true;
-    }
-    if (looseTaskEl) {
-      dragRef.current = { type: 'task', id: looseTaskEl.dataset.taskId, srcEl: looseTaskEl, mouseX: e.clientX, mouseY: e.clientY, ghost: null, dragging: false };
-      e.preventDefault();
-      return true;
-    }
-    if (subGroupHeader) {
-      const sg = subGroupHeader.closest('.sub-group');
-      dragRef.current = { type: 'system', id: sg.dataset.sysId, srcEl: sg, mouseX: e.clientX, mouseY: e.clientY, ghost: null, dragging: false };
-      e.preventDefault();
-      return true;
-    }
-    if (sysHeader) {
-      const sb = sysHeader.closest('.system-box');
-      dragRef.current = { type: 'system', id: sb.dataset.sysId, srcEl: sb, mouseX: e.clientX, mouseY: e.clientY, ghost: null, dragging: false };
-      e.preventDefault();
-      return true;
-    }
-    if (frameDragBar) {
-      const fr = frameDragBar.closest('.canvas-frame');
-      dragRef.current = { type: 'frame', id: fr.dataset.frameId, srcEl: fr, mouseX: e.clientX, mouseY: e.clientY, ghost: null, dragging: false };
-      e.preventDefault();
-      return true;
-    }
-    if (standaloneEl) {
+    // Compute grab offset in screen pixels from element's top-left
+    const initDrag = (type, id, srcEl, extras = {}) => {
+      const r = srcEl.getBoundingClientRect();
       dragRef.current = {
-        type: 'standalone',
-        id: standaloneEl.dataset.frameId,
-        sysId: standaloneEl.dataset.sysId,
-        srcEl: standaloneEl,
+        type,
+        id,
+        srcEl,
         mouseX: e.clientX,
         mouseY: e.clientY,
+        grabScreenOx: e.clientX - r.left,
+        grabScreenOy: e.clientY - r.top,
         ghost: null,
         dragging: false,
+        ...extras,
       };
       e.preventDefault();
       return true;
+    };
+
+    if (taskEl) return initDrag('task', taskEl.dataset.taskId, taskEl);
+    if (looseTaskEl) return initDrag('task', looseTaskEl.dataset.taskId, looseTaskEl);
+    if (subGroupHeader) {
+      const sg = subGroupHeader.closest('.sub-group');
+      return initDrag('system', sg.dataset.sysId, sg);
+    }
+    if (sysHeader) {
+      const sb = sysHeader.closest('.system-box');
+      return initDrag('system', sb.dataset.sysId, sb);
+    }
+    if (frameDragBar) {
+      const fr = frameDragBar.closest('.canvas-frame');
+      return initDrag('frame', fr.dataset.frameId, fr);
+    }
+    if (standaloneEl) {
+      return initDrag('standalone', standaloneEl.dataset.frameId, standaloneEl, {
+        sysId: standaloneEl.dataset.sysId,
+      });
     }
 
     return false; // Not a drag target
@@ -148,13 +149,19 @@ export default function useCanvasDrag({ mapZoom, screenToCanvas, onDropTask, onD
     state.srcEl.classList.remove('canvas-dragging');
     removeGhost();
 
-    const cp = screenToCanvas(e.clientX, e.clientY, vpRect);
+    // Compute canvas position adjusted for grab offset
+    const rawCp = screenToCanvas(e.clientX, e.clientY, vpRect);
+    const cp = {
+      x: snapToGrid(rawCp.x - state.grabScreenOx / mapZoom),
+      y: snapToGrid(rawCp.y - state.grabScreenOy / mapZoom),
+    };
+
     const target = findDropTargetAt(e.clientX, e.clientY, state.type, state.id);
 
     if (state.type === 'frame' || state.type === 'standalone') {
       const ddx = (e.clientX - state.mouseX) / mapZoom;
       const ddy = (e.clientY - state.mouseY) / mapZoom;
-      if (onMoveFrame) onMoveFrame(state.id, ddx, ddy);
+      if (onMoveFrame) onMoveFrame(state.id, snapToGrid(ddx), snapToGrid(ddy));
     } else if (state.type === 'system') {
       if (onDropSystem) onDropSystem(state.id, target, cp);
     } else if (state.type === 'task') {

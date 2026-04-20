@@ -7,6 +7,7 @@ import ContextMenu from './ContextMenu';
 import useCanvasPanZoom from '../hooks/useCanvasPanZoom';
 import useCanvasDrag from '../hooks/useCanvasDrag';
 import useContextMenu from '../hooks/useContextMenu';
+import { findTask } from '../plannerHelpers';
 
 export default function CanvasViewport({
   milestone,
@@ -20,6 +21,15 @@ export default function CanvasViewport({
   onCreateTask,
   onCreateSystem,
   onCreateFrame,
+  // Task editing
+  onRenameTask,
+  onChangeTaskIcon,
+  onSetTaskTime,
+  onUpdateTaskStatus,
+  // System editing
+  onCreateSubSystem,
+  onRenameSystem,
+  onUpdateSystemColors,
 }) {
   const vpRef = useRef(null);
 
@@ -106,13 +116,10 @@ export default function CanvasViewport({
   }, [dragMouseDown, startPan]);
 
   const handleMouseMove = useCallback((e) => {
-    // Pan
     if (isPanning()) {
       movePan(e.clientX, e.clientY);
       return;
     }
-
-    // Resize
     if (resizeRef.current) {
       const rs = resizeRef.current;
       const dx = (e.clientX - rs.startX) / mapZoom;
@@ -125,8 +132,6 @@ export default function CanvasViewport({
       }
       return;
     }
-
-    // Drag
     dragMouseMove(e);
   }, [isPanning, movePan, mapZoom, dragMouseMove]);
 
@@ -134,7 +139,6 @@ export default function CanvasViewport({
     if (e.button === 1) { endPan(1); return; }
     if (e.button === 0) endPan(0);
 
-    // Resize finish
     if (resizeRef.current) {
       const rs = resizeRef.current;
       const newW = parseFloat(rs.el.style.width);
@@ -148,7 +152,6 @@ export default function CanvasViewport({
       return;
     }
 
-    // Drag finish
     if (vpRef.current) {
       dragMouseUp(e, vpRef.current.getBoundingClientRect());
     }
@@ -162,12 +165,57 @@ export default function CanvasViewport({
   }, [handleWheel]);
 
   const handleContextMenu = useCallback((e) => {
-    if (e.target.closest('.task-item,.kanban-card,.loose-task,.map-controls')) return;
+    // Skip map controls and kanban elements
+    if (e.target.closest('.map-controls,.kanban-card')) return;
     e.preventDefault();
+
     const rect = vpRef.current.getBoundingClientRect();
     const cp = screenToCanvas(e.clientX, e.clientY, rect);
-    showContextMenu(e.clientX, e.clientY, cp.x, cp.y);
-  }, [screenToCanvas, showContextMenu]);
+
+    // Determine what was right-clicked
+    const taskEl = e.target.closest('.task-item') || e.target.closest('.loose-task');
+    if (taskEl) {
+      const taskId = taskEl.dataset.taskId;
+      const taskData = findTask(taskId, milestone);
+      showContextMenu({
+        screenX: e.clientX,
+        screenY: e.clientY,
+        canvasX: cp.x,
+        canvasY: cp.y,
+        type: 'task',
+        targetId: taskId,
+        targetData: taskData,
+      });
+      return;
+    }
+
+    const sysHeader = e.target.closest('.system-box-header');
+    const sysBox = e.target.closest('.system-box');
+    if (sysHeader || sysBox) {
+      const box = sysHeader ? sysHeader.closest('.system-box') : sysBox;
+      const sysId = box.dataset.sysId;
+      const sysData = findTask(sysId, milestone);
+      showContextMenu({
+        screenX: e.clientX,
+        screenY: e.clientY,
+        canvasX: cp.x,
+        canvasY: cp.y,
+        type: 'system',
+        targetId: sysId,
+        targetData: sysData,
+      });
+      return;
+    }
+
+    // Default: canvas context menu
+    showContextMenu({
+      screenX: e.clientX,
+      screenY: e.clientY,
+      canvasX: cp.x,
+      canvasY: cp.y,
+      type: 'canvas',
+    });
+  }, [screenToCanvas, showContextMenu, milestone]);
 
   // Register global listeners
   useEffect(() => {
@@ -234,9 +282,23 @@ export default function CanvasViewport({
         <ContextMenu
           x={contextMenu.x}
           y={contextMenu.y}
+          type={contextMenu.type}
+          targetId={contextMenu.targetId}
+          targetData={contextMenu.targetData}
+          // Canvas actions
           onNewTask={() => onCreateTask(contextMenu.canvasX, contextMenu.canvasY)}
           onNewSystem={() => onCreateSystem(contextMenu.canvasX, contextMenu.canvasY)}
           onNewFrame={() => onCreateFrame(contextMenu.canvasX, contextMenu.canvasY)}
+          // Task actions
+          onRenameTask={onRenameTask}
+          onChangeTaskIcon={onChangeTaskIcon}
+          onSetTaskTime={onSetTaskTime}
+          onUpdateTaskStatus={onUpdateTaskStatus}
+          // System actions
+          onRenameSystem={onRenameSystem}
+          onCreateSubSystem={onCreateSubSystem}
+          onUpdateSystemColors={onUpdateSystemColors}
+          // Common
           onClose={closeContextMenu}
         />
       )}

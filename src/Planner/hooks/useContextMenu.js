@@ -1,10 +1,19 @@
 import { useState, useCallback, useEffect } from 'react';
 
 export default function useContextMenu() {
-  const [contextMenu, setContextMenu] = useState(null); // { x, y, canvasX, canvasY }
+  // { x, y, canvasX, canvasY, type: 'canvas'|'task'|'system', targetId, targetData }
+  const [contextMenu, setContextMenu] = useState(null);
 
-  const showContextMenu = useCallback((screenX, screenY, canvasX, canvasY) => {
-    setContextMenu({ x: screenX, y: screenY, canvasX, canvasY });
+  const showContextMenu = useCallback((opts) => {
+    setContextMenu({
+      x: opts.screenX,
+      y: opts.screenY,
+      canvasX: opts.canvasX || 0,
+      canvasY: opts.canvasY || 0,
+      type: opts.type || 'canvas',
+      targetId: opts.targetId || null,
+      targetData: opts.targetData || null,
+    });
   }, []);
 
   const closeContextMenu = useCallback(() => {
@@ -15,11 +24,10 @@ export default function useContextMenu() {
   useEffect(() => {
     if (!contextMenu) return;
     const handler = (e) => {
-      if (!e.target.closest('.context-menu')) {
+      if (!e.target.closest('.context-menu') && !e.target.closest('.color-picker-popover')) {
         setContextMenu(null);
       }
     };
-    // Delay to prevent the same click from closing
     const timer = setTimeout(() => {
       document.addEventListener('mousedown', handler);
     }, 0);

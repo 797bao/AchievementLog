@@ -3,12 +3,14 @@ import { createSampleMilestones, MONTH_NAMES } from '../plannerData';
 import {
   getAllLeaves,
   findTask,
+  findInNode,
   removeTaskFromTree,
   removeSystemFromAny,
   autoLayoutMilestone,
   monthKey,
   parseTime,
   formatTime,
+  snapToGrid,
 } from '../plannerHelpers';
 
 export default function usePlannerState() {
@@ -96,7 +98,6 @@ export default function usePlannerState() {
   const openSprintOverview = useCallback(() => {
     setIsSprintOverview((prev) => {
       if (prev) {
-        // Close board
         setCurrentBoardId(null);
         setCurrentBoardPath(null);
         return false;
@@ -128,12 +129,26 @@ export default function usePlannerState() {
       const milestone = ms[activeMilestoneIdx];
       const sysNode = findTask(sysId, milestone);
       if (!sysNode) return;
+
+      // Circular nesting guard: can't drop a system into its own descendant
+      if (target && target.type === 'system') {
+        if (findInNode(target.id, sysNode)) return; // target is inside dragged node
+      }
+
       const sysCopy = JSON.parse(JSON.stringify(sysNode));
       removeSystemFromAny(sysId, milestone);
 
       if (target && target.type === 'frame') {
         const targetFrame = milestone.frames.find((f) => f.id === target.id);
         if (targetFrame) targetFrame.systems.push(sysCopy);
+      } else if (target && target.type === 'system') {
+        // Drop system into another system as a sub-system
+        const targetSys = findTask(target.id, milestone);
+        if (targetSys) {
+          sysCopy.isGroup = true;
+          if (!targetSys.children) targetSys.children = [];
+          targetSys.children.push(sysCopy);
+        }
       } else {
         sysCopy.x = canvasPos.x;
         sysCopy.y = canvasPos.y;
@@ -193,8 +208,8 @@ export default function usePlannerState() {
         time: null,
         sprint: null,
         completedAt: null,
-        x,
-        y,
+        x: snapToGrid(x),
+        y: snapToGrid(y),
       });
     });
   }, [activeMilestoneIdx, updateMilestones]);
@@ -207,8 +222,8 @@ export default function usePlannerState() {
         id: 'sys-' + Date.now(),
         name: 'New System',
         children: [],
-        x,
-        y,
+        x: snapToGrid(x),
+        y: snapToGrid(y),
         w: 250,
       });
     });
@@ -220,14 +235,35 @@ export default function usePlannerState() {
         id: 'frame-' + Date.now(),
         label: 'New Frame',
         systems: [],
-        x,
-        y,
+        x: snapToGrid(x),
+        y: snapToGrid(y),
         w: 500,
       });
     });
   }, [activeMilestoneIdx, updateMilestones]);
 
-  /* ─── Kanban actions ─── */
+  /* ─── Task editing actions ─── */
+  const renameTask = useCallback((taskId, newName) => {
+    updateMilestones((ms) => {
+      const task = findTask(taskId, ms[activeMilestoneIdx]);
+      if (task) task.name = newName;
+    });
+  }, [activeMilestoneIdx, updateMilestones]);
+
+  const changeTaskIcon = useCallback((taskId, newType) => {
+    updateMilestones((ms) => {
+      const task = findTask(taskId, ms[activeMilestoneIdx]);
+      if (task) task.type = newType;
+    });
+  }, [activeMilestoneIdx, updateMilestones]);
+
+  const setTaskTime = useCallback((taskId, time) => {
+    updateMilestones((ms) => {
+      const task = findTask(taskId, ms[activeMilestoneIdx]);
+      if (task) task.time = time;
+    });
+  }, [activeMilestoneIdx, updateMilestones]);
+
   const updateTaskStatus = useCallback((taskId, newStatus) => {
     updateMilestones((ms) => {
       const task = findTask(taskId, ms[activeMilestoneIdx]);
@@ -241,6 +277,40 @@ export default function usePlannerState() {
     });
   }, [activeMilestoneIdx, boardMonth, updateMilestones]);
 
+  /* ─── System editing actions ─── */
+  const createSubSystem = useCallback((parentSysId) => {
+    updateMilestones((ms) => {
+      const parent = findTask(parentSysId, ms[activeMilestoneIdx]);
+      if (!parent) return;
+      if (!parent.children) parent.children = [];
+      parent.children.push({
+        id: 'sys-' + Date.now(),
+        name: 'New Sub-System',
+        type: 'system',
+        isGroup: true,
+        children: [],
+      });
+    });
+  }, [activeMilestoneIdx, updateMilestones]);
+
+  const renameSystem = useCallback((sysId, newName) => {
+    updateMilestones((ms) => {
+      const sys = findTask(sysId, ms[activeMilestoneIdx]);
+      if (sys) sys.name = newName;
+    });
+  }, [activeMilestoneIdx, updateMilestones]);
+
+  const updateSystemColors = useCallback((sysId, colors) => {
+    updateMilestones((ms) => {
+      const sys = findTask(sysId, ms[activeMilestoneIdx]);
+      if (sys) {
+        if (colors.headerBg !== undefined) sys.headerBg = colors.headerBg;
+        if (colors.headerText !== undefined) sys.headerText = colors.headerText;
+      }
+    });
+  }, [activeMilestoneIdx, updateMilestones]);
+
+  /* ─── Kanban actions ─── */
   const assignSprint = useCallback((taskId) => {
     updateMilestones((ms) => {
       const task = findTask(taskId, ms[activeMilestoneIdx]);
@@ -296,7 +366,13 @@ export default function usePlannerState() {
     createNewTask,
     createNewSystem,
     createNewFrame,
+    renameTask,
+    changeTaskIcon,
+    setTaskTime,
     updateTaskStatus,
+    createSubSystem,
+    renameSystem,
+    updateSystemColors,
     assignSprint,
     unassignSprint,
     updateTaskOrder,

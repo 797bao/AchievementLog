@@ -2,7 +2,7 @@
    PLANNER PURE HELPER FUNCTIONS
    ═══════════════════════════════════════ */
 
-import { MONTH_NAMES, TYPE_ICON_FILES } from './plannerData';
+import { MONTH_NAMES, TYPE_ICON_FILES, GRID_SIZE } from './plannerData';
 
 /* ─── Date / Sprint helpers ─── */
 export function monthKey(y, m) {
@@ -86,6 +86,16 @@ export function getProgressClass(pct) {
 
 export function iconFor(type) {
   return TYPE_ICON_FILES[type] || TYPE_ICON_FILES.script;
+}
+
+export function snapToGrid(val, gridSize = GRID_SIZE) {
+  return Math.round(val / gridSize) * gridSize;
+}
+
+export function getFrameTotalTime(frame) {
+  let total = 0;
+  (frame.systems || []).forEach((sys) => { total += getTotalTime(sys); });
+  return total;
 }
 
 /* ─── Milestone-level queries ─── */

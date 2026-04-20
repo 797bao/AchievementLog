@@ -1034,3 +1034,264 @@
   pointer-events: none;
   box-shadow: 0 0 6px rgba(138, 180, 248, 0.5);
 }
+
+/* ── Task status bar (thin vertical color indicator) ── */
+.task-status-bar {
+  width: 3px;
+  border-radius: 2px;
+  align-self: stretch;
+  flex-shrink: 0;
+  min-height: 14px;
+}
+
+.task-status-bar.loose {
+  width: 4px;
+  border-radius: 3px;
+  min-height: 18px;
+}
+
+/* ── Task time label ── */
+.task-time {
+  font-size: 9px;
+  color: #5f6368;
+  flex-shrink: 0;
+  font-family: -apple-system, sans-serif;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 1px 4px;
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+/* ── Sub-group time ── */
+.sub-group-time {
+  font-size: 9px;
+  color: #5f6368;
+  flex-shrink: 0;
+  font-family: -apple-system, sans-serif;
+  pointer-events: none;
+}
+
+/* ── Frame time ── */
+.frame-time {
+  font-size: 10px;
+  color: #5f6368;
+  margin-left: auto;
+  font-family: -apple-system, sans-serif;
+  pointer-events: none;
+  letter-spacing: 0.5px;
+}
+
+/* ── Root / Standalone time ── */
+.root-time {
+  color: #5f6368;
+}
+
+/* ── Nested system wrapper ── */
+.nested-system-wrapper {
+  margin: 4px 0;
+}
+
+.nested-system-wrapper .system-box {
+  min-width: auto;
+  max-width: none;
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+/* ── System box overflow ── */
+.system-box-overflow {
+  font-size: 10px;
+  color: #ea4335;
+  padding: 8px;
+  text-align: center;
+}
+
+/* ── Context menu enhancements ── */
+.ctx-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 2px;
+  padding: 4px 8px 6px;
+}
+
+.ctx-icon-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 2px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.ctx-icon-item:hover {
+  background: rgba(138, 180, 248, 0.15);
+}
+
+.ctx-icon-item.active {
+  background: rgba(138, 180, 248, 0.25);
+  outline: 1px solid #8ab4f8;
+}
+
+.ctx-icon-img {
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+}
+
+.ctx-icon-label {
+  font-size: 8px;
+  color: #9aa0a6;
+  text-transform: uppercase;
+}
+
+/* ── Status list in context menu ── */
+.ctx-status-list {
+  padding: 2px 8px 4px;
+}
+
+.ctx-status-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #e8eaed;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.ctx-status-item:hover {
+  background: rgba(138, 180, 248, 0.15);
+}
+
+.ctx-status-item.active {
+  background: rgba(138, 180, 248, 0.1);
+  font-weight: 600;
+}
+
+.ctx-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Color panel in system context menu ── */
+.ctx-color-panel {
+  padding: 4px 8px 8px;
+}
+
+.ctx-color-spacer {
+  height: 8px;
+}
+
+/* ── Color Picker Popover ── */
+.color-picker-popover {
+  background: #2c2f38;
+  border: 1px solid #3c3f47;
+  border-radius: 8px;
+  padding: 8px;
+  min-width: 200px;
+}
+
+.cp-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #5f6368;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.cp-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.cp-preview {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+}
+
+.cp-hex-input {
+  flex: 1;
+  background: #1a1b1e;
+  border: 1px solid #3c3f47;
+  border-radius: 4px;
+  color: #e8eaed;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-family: 'Courier New', monospace;
+  outline: none;
+}
+
+.cp-hex-input:focus {
+  border-color: #8ab4f8;
+}
+
+.cp-fav-btn {
+  background: none;
+  border: 1px solid #3c3f47;
+  color: #fbbc04;
+  border-radius: 4px;
+  width: 26px;
+  height: 26px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.cp-fav-btn:hover {
+  border-color: #fbbc04;
+  background: rgba(251, 188, 4, 0.1);
+}
+
+.cp-section-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #5f6368;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.cp-swatch-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-bottom: 6px;
+}
+
+.cp-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color 0.1s, transform 0.1s;
+}
+
+.cp-swatch:hover {
+  transform: scale(1.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.cp-swatch.active {
+  border-color: #fff;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.4);
+}
+
+.cp-swatch.fav {
+  border-color: rgba(251, 188, 4, 0.3);
+}

@@ -59,6 +59,15 @@ export default function Planner() {
           onCreateTask={state.createNewTask}
           onCreateSystem={state.createNewSystem}
           onCreateFrame={state.createNewFrame}
+          // Task editing
+          onRenameTask={state.renameTask}
+          onChangeTaskIcon={state.changeTaskIcon}
+          onSetTaskTime={state.setTaskTime}
+          onUpdateTaskStatus={state.updateTaskStatus}
+          // System editing
+          onCreateSubSystem={state.createSubSystem}
+          onRenameSystem={state.renameSystem}
+          onUpdateSystemColors={state.updateSystemColors}
         />
 
         <BoardView

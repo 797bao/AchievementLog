@@ -1,9 +1,10 @@
 import React from 'react';
-import { getProgress, getProgressColor } from '../plannerHelpers';
+import { getProgress, getProgressColor, getTotalTime, formatTime } from '../plannerHelpers';
 
 export default function StandaloneNode({ frame }) {
   const sys = frame.systems[0];
   const prog = getProgress(sys);
+  const totalT = getTotalTime(sys);
 
   return (
     <div
@@ -21,6 +22,7 @@ export default function StandaloneNode({ frame }) {
       </div>
       <div className="root-pct">
         {prog.done}/{prog.total} &middot; {prog.pct}%
+        {totalT > 0 && <span className="root-time"> &middot; {formatTime(totalT)}</span>}
       </div>
     </div>
   );
