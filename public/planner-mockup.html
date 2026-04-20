@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Project Planner - Mockup</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #202124;
+    color: #e8eaed;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ── Top Bar ── */
+  .topbar {
+    height: 48px;
+    background: #2C2F38;
+    border-bottom: 1px solid #3c3f47;
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 16px;
+  }
+  .topbar-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #e8eaed;
+  }
+  .breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #9aa0a6;
+  }
+  .breadcrumb span { cursor: pointer; }
+  .breadcrumb span:hover { color: #e8eaed; }
+  .breadcrumb .sep { color: #5f6368; cursor: default; }
+  .breadcrumb .current { color: #8ab4f8; }
+  .topbar-actions {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+  }
+  .view-btn {
+    padding: 5px 12px;
+    border-radius: 6px;
+    border: 1px solid #3c3f47;
+    background: transparent;
+    color: #9aa0a6;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .view-btn:hover { border-color: #5f6368; color: #e8eaed; }
+  .view-btn.active { background: rgba(138,180,248,0.15); border-color: #8ab4f8; color: #8ab4f8; }
+
+  /* ── Layout ── */
+  .layout {
+    display: flex;
+    height: calc(100vh - 48px);
+  }
+
+  /* ── Tree Panel (Left) ── */
+  .tree-panel {
+    width: 280px;
+    min-width: 280px;
+    background: #292b2f;
+    border-right: 1px solid #3c3f47;
+    overflow-y: auto;
+    padding: 12px 0;
+  }
+  .tree-node {
+    cursor: pointer;
+    user-select: none;
+  }
+  .tree-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    transition: background 0.1s;
+    position: relative;
+  }
+  .tree-row:hover { background: rgba(255,255,255,0.04); }
+  .tree-row.selected { background: rgba(138,180,248,0.1); }
+  .tree-row.selected::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: #8ab4f8;
+    border-radius: 0 2px 2px 0;
+  }
+  .tree-chevron {
+    width: 16px;
+    font-size: 10px;
+    color: #5f6368;
+    text-align: center;
+    flex-shrink: 0;
+    transition: transform 0.15s;
+  }
+  .tree-chevron.open { transform: rotate(90deg); }
+  .tree-chevron.leaf { visibility: hidden; }
+  .tree-label {
+    font-size: 13px;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .tree-progress {
+    width: 48px;
+    height: 4px;
+    background: #3c3f47;
+    border-radius: 2px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .tree-progress-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s;
+  }
+  .tree-pct {
+    font-size: 11px;
+    color: #5f6368;
+    width: 30px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .tree-children {
+    overflow: hidden;
+  }
+  .tree-children.collapsed { display: none; }
+
+  /* Indent levels */
+  .depth-0 .tree-row { padding-left: 12px; }
+  .depth-1 .tree-row { padding-left: 28px; }
+  .depth-2 .tree-row { padding-left: 44px; }
+  .depth-3 .tree-row { padding-left: 60px; }
+
+  /* ── Detail Panel (Right) ── */
+  .detail-panel {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 32px;
+  }
+  .detail-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+  .detail-title {
+    font-size: 20px;
+    font-weight: 600;
+  }
+  .detail-stats {
+    display: flex;
+    gap: 16px;
+    font-size: 13px;
+    color: #9aa0a6;
+    margin-bottom: 24px;
+  }
+  .stat-value { color: #e8eaed; font-weight: 600; }
+
+  /* ── Cards Grid (List View) ── */
+  .cards-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .task-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid #3c3f47;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .task-card:hover {
+    background: rgba(255,255,255,0.06);
+    border-color: #5f6368;
+  }
+  .task-card.has-children:hover {
+    border-color: #8ab4f8;
+  }
+  .task-type {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .type-art { background: rgba(52,168,83,0.2); color: #34a853; }
+  .type-anim { background: rgba(66,133,244,0.2); color: #4285f4; }
+  .type-script { background: rgba(154,160,166,0.2); color: #9aa0a6; }
+  .type-rig { background: rgba(234,67,53,0.2); color: #ea4335; }
+  .type-fx { background: rgba(251,188,4,0.2); color: #fbbc04; }
+  .type-prefab { background: rgba(168,85,247,0.2); color: #a855f7; }
+  .type-system { background: rgba(138,180,248,0.15); color: #8ab4f8; }
+  .task-info { flex: 1; min-width: 0; }
+  .task-name {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 2px;
+  }
+  .task-meta {
+    font-size: 12px;
+    color: #5f6368;
+  }
+  .task-status {
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .task-status:hover { filter: brightness(1.2); }
+  .status-planned { background: rgba(154,160,166,0.15); color: #9aa0a6; }
+  .status-progress { background: rgba(66,133,244,0.2); color: #4285f4; }
+  .status-testing { background: rgba(251,188,4,0.2); color: #fbbc04; }
+  .status-done { background: rgba(52,168,83,0.2); color: #34a853; }
+  .task-time {
+    font-size: 12px;
+    color: #5f6368;
+    flex-shrink: 0;
+    min-width: 36px;
+    text-align: right;
+  }
+  .task-drill {
+    font-size: 14px;
+    color: #3c3f47;
+    flex-shrink: 0;
+    transition: color 0.15s;
+  }
+  .task-card.has-children:hover .task-drill { color: #8ab4f8; }
+
+  /* ── Board View (Kanban) ── */
+  .board-view {
+    display: none;
+    gap: 16px;
+    overflow-x: auto;
+  }
+  .board-view.active { display: flex; }
+  .cards-grid.hidden { display: none; }
+  .board-column {
+    min-width: 220px;
+    flex: 1;
+  }
+  .column-header {
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+    text-align: center;
+  }
+  .col-planned { background: rgba(154,160,166,0.1); color: #9aa0a6; }
+  .col-progress { background: rgba(66,133,244,0.15); color: #4285f4; }
+  .col-testing { background: rgba(251,188,4,0.15); color: #fbbc04; }
+  .col-done { background: rgba(52,168,83,0.15); color: #34a853; }
+  .board-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .board-card {
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid #3c3f47;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .board-card:hover { background: rgba(255,255,255,0.06); border-color: #5f6368; }
+  .board-card-name { font-size: 13px; font-weight: 500; margin-bottom: 4px; }
+  .board-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: #5f6368;
+  }
+  .board-type-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* ── Today View ── */
+  .today-panel {
+    display: none;
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 32px;
+  }
+  .today-panel.active { display: block; }
+  .detail-panel.hidden { display: none; }
+  .today-section {
+    margin-bottom: 32px;
+  }
+  .today-section-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #5f6368;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #3c3f47;
+  }
+  .today-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.12s;
+    margin-bottom: 2px;
+  }
+  .today-card:hover { background: rgba(255,255,255,0.04); }
+  .today-path {
+    font-size: 11px;
+    color: #5f6368;
+  }
+
+  /* ── Tooltip ── */
+  .hint {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #3c3f47;
+    color: #e8eaed;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    z-index: 100;
+    pointer-events: none;
+    transition: opacity 0.3s;
+    white-space: nowrap;
+  }
+  .hint.hidden { opacity: 0; }
+
+  /* ── Annotations ── */
+  .annotation {
+    position: fixed;
+    background: #fbbf24;
+    color: #202124;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    z-index: 50;
+    pointer-events: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  .annotation::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 0;
+  }
+  .ann-left::after {
+    right: -6px;
+    top: 50%;
+    transform: translateY(-50%);
+    border-left: 6px solid #fbbf24;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+  }
+  .ann-right::after {
+    left: -6px;
+    top: 50%;
+    transform: translateY(-50%);
+    border-right: 6px solid #fbbf24;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+  }
+  .ann-down::after {
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-top: 6px solid #fbbf24;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Top Bar ── -->
+<div class="topbar">
+  <div class="topbar-title">Planner</div>
+  <div class="breadcrumb" id="breadcrumb">
+    <span onclick="navigateTo('root')">Milestone 1</span>
+  </div>
+  <div class="topbar-actions">
+    <button class="view-btn" id="btn-today" onclick="toggleToday()">Today</button>
+    <button class="view-btn active" id="btn-list" onclick="setView('list')">List</button>
+    <button class="view-btn" id="btn-board" onclick="setView('board')">Board</button>
+  </div>
+</div>
+
+<!-- ── Main Layout ── -->
+<div class="layout">
+
+  <!-- ── Tree (Left) ── -->
+  <div class="tree-panel" id="tree"></div>
+
+  <!-- ── Detail (Right) ── -->
+  <div class="detail-panel" id="detail"></div>
+
+  <!-- ── Today (Right, hidden) ── -->
+  <div class="today-panel" id="today-panel"></div>
+
+</div>
+
+<!-- ── Hint ── -->
+<div class="hint hidden" id="hint"></div>
+
+<script>
+// ── Status definitions ──
+var STATUSES = ['planned','progress','testing','done'];
+var STATUS_LABELS = { planned:'Planned', progress:'In Progress', testing:'Testing', done:'Done' };
+var STATUS_COLORS = { planned:'#9aa0a6', progress:'#4285f4', testing:'#fbbc04', done:'#34a853' };
+
+// ── Type definitions ──
+var TYPE_ICONS = {
+  system: '📦', art: '🎨', anim: '🎬', script: '⚙️',
+  rig: '🦴', fx: '✨', prefab: '🧩', props: '📋', ui: '🖼️'
+};
+
+// ── Data: Your actual Excalidraw structure ──
+var data = {
+  id: 'root',
+  name: 'Milestone 1: Basic Melee Enemy Combat',
+  type: 'system',
+  children: [
+    {
+      id: 'kairos-char', name: 'Kairos (Character)', type: 'system', time: null,
+      children: [
+        { id: 'k-art', name: 'Artwork', type: 'art', status: 'done', time: '2h' },
+        { id: 'k-rig', name: 'Spine2D Rig', type: 'rig', status: 'done', time: '4h' },
+        { id: 'k-move', name: 'Move Anim', type: 'anim', status: 'done', time: '2h' },
+        { id: 'k-idle', name: 'Idle Anim', type: 'anim', status: 'done', time: '2h' },
+        { id: 'k-script', name: 'Player Script', type: 'script', status: 'done', time: '3h' },
+      ]
+    },
+    {
+      id: 'card-sys', name: 'Card System', type: 'system', time: null,
+      children: [
+        {
+          id: 'card', name: 'Card', type: 'system',
+          children: [
+            { id: 'c-props', name: 'Properties', type: 'props', status: 'done', time: '1h' },
+            { id: 'c-canplay', name: 'CanPlay Condition', type: 'script', status: 'done', time: '1h' },
+            { id: 'c-onplay', name: 'OnPlay', type: 'script', status: 'done', time: '2h' },
+            { id: 'c-ondraw', name: 'OnDraw', type: 'script', status: 'done', time: '1h' },
+            { id: 'c-ondiscard', name: 'OnDiscard', type: 'script', status: 'done', time: '1h' },
+          ]
+        },
+        {
+          id: 'card-mgr', name: 'Card Manager', type: 'system',
+          children: [
+            { id: 'cm-deck', name: 'Deck Pile', type: 'script', status: 'done', time: '2h' },
+            { id: 'cm-discard', name: 'Discard Pile', type: 'script', status: 'done', time: '1h' },
+            { id: 'cm-draw', name: 'Draw Card', type: 'script', status: 'done', time: '2h' },
+            { id: 'cm-discard2', name: 'Discard Card', type: 'script', status: 'done', time: '1h' },
+            { id: 'cm-shuffle', name: 'Shuffle Deck', type: 'script', status: 'done', time: '1h' },
+            { id: 'cm-hand', name: 'Hand Pile Logic', type: 'script', status: 'progress', time: '3h' },
+            { id: 'cm-play', name: 'Play Card', type: 'script', status: 'progress', time: '2h' },
+          ]
+        },
+        { id: 'cs-draw-anim', name: 'Card Draw Anim', type: 'anim', status: 'done', time: '2h' },
+        { id: 'cs-stack-anim', name: 'Card Stack Anim', type: 'anim', status: 'done', time: '1h' },
+        { id: 'cs-play-anim', name: 'Card Play Anim', type: 'anim', status: 'done', time: '2h' },
+        { id: 'cs-hover-anim', name: 'Card Hover Anim', type: 'anim', status: 'done', time: '1h' },
+        { id: 'cs-playable', name: 'Card Playable Anim', type: 'anim', status: 'progress', time: '2h' },
+        { id: 'cs-hover-logic', name: 'Card Hover Logic', type: 'script', status: 'done', time: '2h' },
+        { id: 'cs-hand-ui', name: 'UI Hand Placement', type: 'ui', status: 'done', time: '3h' },
+        { id: 'cs-hover-desc', name: 'Hover Description', type: 'ui', status: 'planned', time: '2h' },
+      ]
+    },
+    {
+      id: 'grid-sys', name: 'Grid System', type: 'system', time: null,
+      children: [
+        {
+          id: 'grid-mgr', name: 'Grid Manager', type: 'system',
+          children: [
+            { id: 'gm-pos', name: 'GetGridPos', type: 'script', status: 'done', time: '1h' },
+            { id: 'gm-reg', name: 'RegisterUnit', type: 'script', status: 'done', time: '1h' },
+            { id: 'gm-unreg', name: 'UnRegisterUnit', type: 'script', status: 'done', time: '1h' },
+            { id: 'gm-gen', name: 'GenerateGrid', type: 'script', status: 'done', time: '2h' },
+            { id: 'gm-dir', name: 'GetMouseDir', type: 'script', status: 'done', time: '1h' },
+            { id: 'gm-coord', name: 'GetMouseCoord', type: 'script', status: 'done', time: '1h' },
+          ]
+        },
+        {
+          id: 'player-tile', name: 'Player Tile', type: 'system',
+          children: [
+            { id: 'pt-move', name: 'Move Clip To Grid', type: 'anim', status: 'done', time: '2h' },
+            { id: 'pt-fx', name: 'Effect', type: 'fx', status: 'done', time: '1h' },
+            { id: 'pt-pulse', name: 'Pulse Animation', type: 'anim', status: 'done', time: '1h' },
+          ]
+        },
+        {
+          id: 'enemy-tile', name: 'Enemy Tile', type: 'system',
+          children: [
+            { id: 'et-enable', name: 'Enable', type: 'script', status: 'done', time: '1h' },
+            { id: 'et-fx', name: 'Effect', type: 'fx', status: 'done', time: '1h' },
+            { id: 'et-pulse', name: 'Pulse Animation', type: 'anim', status: 'done', time: '1h' },
+          ]
+        },
+      ]
+    },
+    {
+      id: 'enemy-sys', name: 'Enemy System', type: 'system', time: null,
+      children: [
+        {
+          id: 'enemy1', name: 'Enemy 1', type: 'system', time: '30m',
+          children: [
+            { id: 'e1-art', name: 'Artwork', type: 'art', status: 'done', time: '15m' },
+            { id: 'e1-props', name: 'Properties', type: 'props', status: 'done', time: '15m' },
+          ]
+        },
+        {
+          id: 'enemy-heart', name: 'Enemy Heart UI', type: 'system', time: '3h',
+          children: [
+            { id: 'eh-art', name: 'Artwork', type: 'art', status: 'progress', time: '1h' },
+            { id: 'eh-hit', name: 'OnHit Animation', type: 'anim', status: 'planned', time: '1h' },
+            { id: 'eh-scale', name: 'Scale/Fill Follow Logic', type: 'script', status: 'planned', time: '1h' },
+          ]
+        },
+        { id: 'es-onhit', name: 'Global On Hit Anim', type: 'anim', status: 'planned', time: '45m' },
+        { id: 'es-attack', name: 'Global Attack Anim', type: 'anim', status: 'planned', time: '45m' },
+        { id: 'es-death', name: 'Global Death Anim', type: 'anim', status: 'planned', time: '30m' },
+        {
+          id: 'enemy-intent', name: 'Enemy Intent Indicator', type: 'system', time: '1.5h',
+          children: [
+            { id: 'ei-atk', name: 'Attack Intent', type: 'art', status: 'planned', time: '30m' },
+            { id: 'ei-def', name: 'Defend Intent', type: 'art', status: 'planned', time: '30m' },
+            { id: 'ei-buff', name: 'Buff Intent', type: 'art', status: 'planned', time: '30m' },
+          ]
+        },
+      ]
+    },
+    {
+      id: 'kairos-basic', name: 'Kairos Basic Card', type: 'system', time: '8h',
+      children: [
+        { id: 'kb-art', name: 'Card Artwork', type: 'art', status: 'planned', time: '2h' },
+        { id: 'kb-atk1', name: 'Kairos Attack Anim 1', type: 'anim', status: 'planned', time: '1.5h' },
+        { id: 'kb-atk2', name: 'Kairos Attack Anim 2', type: 'anim', status: 'planned', time: '1.5h' },
+        { id: 'kb-trans', name: 'Anim State Transition', type: 'anim', status: 'planned', time: '1h' },
+        { id: 'kb-fx', name: 'Card Attack Effect', type: 'fx', status: 'planned', time: '1h' },
+        { id: 'kb-logic', name: 'Attack Card Logic', type: 'script', status: 'planned', time: '1h' },
+      ]
+    },
+    {
+      id: 'kairos-prune', name: 'Kairos Prune Ability', type: 'system', time: '10h',
+      children: [
+        { id: 'kp-chan', name: 'Kairos Channel Animation', type: 'anim', status: 'progress', time: '2h' },
+        { id: 'kp-prune', name: 'Kairos Prune Animation', type: 'anim', status: 'progress', time: '2h' },
+        { id: 'kp-blast', name: 'Kairos Prune Blast', type: 'fx', status: 'planned', time: '1h' },
+        { id: 'kp-pruning', name: 'Card Pruning Animation', type: 'anim', status: 'planned', time: '1h' },
+        { id: 'kp-pruned', name: 'Card Pruned Animation', type: 'anim', status: 'planned', time: '1h' },
+        { id: 'kp-logic', name: 'Kairos Prune Logic', type: 'script', status: 'planned', time: '1.5h' },
+        { id: 'kp-tile', name: 'Kairos Prune Tile', type: 'prefab', status: 'planned', time: '0.5h' },
+        { id: 'kp-tlogic', name: 'Kairos Prune Tile Logic', type: 'script', status: 'planned', time: '1h' },
+      ]
+    },
+    {
+      id: 'kairos-bonk', name: 'Kairos Bonk Card', type: 'system', time: '3h',
+      children: [
+        { id: 'kbk-art', name: 'Card Artwork', type: 'art', status: 'planned', time: '1h' },
+        { id: 'kbk-fx', name: 'Card Attack Effect', type: 'fx', status: 'planned', time: '1h' },
+        { id: 'kbk-logic', name: 'Bonk Card Logic', type: 'script', status: 'planned', time: '1h' },
+      ]
+    },
+    {
+      id: 'health-mana', name: 'Health & Mana', type: 'system', time: '4h',
+      children: [
+        { id: 'hm-hart', name: 'Health Artwork', type: 'art', status: 'done', time: '1h' },
+        { id: 'hm-mart', name: 'Mana Artwork', type: 'art', status: 'done', time: '1h' },
+        { id: 'hm-manim', name: 'Mana Animation', type: 'anim', status: 'progress', time: '2h' },
+      ]
+    },
+    {
+      id: 'kairos-fx', name: 'Kairos (Effects)', type: 'system', time: '5h',
+      children: [
+        { id: 'kfx-hit', name: 'On Hit Animation', type: 'anim', status: 'planned', time: '2h' },
+        { id: 'kfx-death', name: 'Death Animation', type: 'anim', status: 'planned', time: '2h' },
+        { id: 'kfx-unplay', name: 'Card Unplayable Animation', type: 'anim', status: 'progress', time: '1h' },
+      ]
+    },
+  ]
+};
+
+// ── State ──
+var selectedId = 'root';
+var expandedNodes = { root: true, 'card-sys': true, 'enemy-sys': true };
+var currentView = 'list'; // 'list' or 'board'
+var todayMode = false;
+
+// ── Helpers ──
+function findNode(id, node) {
+  if (!node) node = data;
+  if (node.id === id) return node;
+  if (node.children) {
+    for (var i = 0; i < node.children.length; i++) {
+      var found = findNode(id, node.children[i]);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function getLeaves(node) {
+  if (!node.children || node.children.length === 0) return [node];
+  var leaves = [];
+  node.children.forEach(function(c) { leaves = leaves.concat(getLeaves(c)); });
+  return leaves;
+}
+
+function getProgress(node) {
+  var leaves = getLeaves(node);
+  if (leaves.length === 0) return { done: 0, total: 0, pct: 0 };
+  var done = leaves.filter(function(l) { return l.status === 'done'; }).length;
+  return { done: done, total: leaves.length, pct: Math.round(done / leaves.length * 100) };
+}
+
+function getProgressColor(pct) {
+  if (pct === 100) return '#34a853';
+  if (pct >= 50) return '#8ab4f8';
+  if (pct > 0) return '#fbbc04';
+  return '#5f6368';
+}
+
+function parseTime(t) {
+  if (!t) return 0;
+  if (t.indexOf('h') > -1) return parseFloat(t) * 60;
+  if (t.indexOf('m') > -1) return parseFloat(t);
+  return 0;
+}
+
+function formatTime(mins) {
+  if (mins >= 60) {
+    var h = Math.floor(mins / 60);
+    var m = mins % 60;
+    return m > 0 ? h + 'h ' + m + 'm' : h + 'h';
+  }
+  return mins + 'm';
+}
+
+function getTotalTime(node) {
+  var leaves = getLeaves(node);
+  var total = 0;
+  leaves.forEach(function(l) { total += parseTime(l.time); });
+  return total;
+}
+
+function getDoneTime(node) {
+  var leaves = getLeaves(node);
+  var done = 0;
+  leaves.forEach(function(l) { if (l.status === 'done') done += parseTime(l.time); });
+  return done;
+}
+
+function getAllByStatus(node, status) {
+  var result = [];
+  if (!node.children || node.children.length === 0) {
+    if (node.status === status) result.push(node);
+    return result;
+  }
+  node.children.forEach(function(c) { result = result.concat(getAllByStatus(c, status)); });
+  return result;
+}
+
+function findParentPath(targetId, node, path) {
+  if (!node) node = data;
+  if (!path) path = [];
+  if (node.id === targetId) return path;
+  if (node.children) {
+    for (var i = 0; i < node.children.length; i++) {
+      var found = findParentPath(targetId, node.children[i], path.concat([node]));
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+// ── Render Tree ──
+function renderTree() {
+  var el = document.getElementById('tree');
+  el.innerHTML = renderTreeNode(data, 0);
+}
+
+function renderTreeNode(node, depth) {
+  var hasChildren = node.children && node.children.length > 0;
+  var isExpanded = expandedNodes[node.id];
+  var isSelected = node.id === selectedId;
+  var prog = getProgress(node);
+  var isLeaf = !hasChildren;
+
+  var html = '<div class="tree-node depth-' + depth + '">';
+  html += '<div class="tree-row' + (isSelected ? ' selected' : '') + '" onclick="treeClick(\'' + node.id + '\')">';
+  html += '<span class="tree-chevron ' + (isLeaf ? 'leaf' : (isExpanded ? 'open' : '')) + '">&#9654;</span>';
+
+  if (isLeaf) {
+    var sc = 'status-' + (node.status || 'planned');
+    var dot = node.status === 'done' ? '✓' : '○';
+    html += '<span style="width:14px;text-align:center;font-size:11px;color:' + STATUS_COLORS[node.status || 'planned'] + '">' + dot + '</span> ';
+  }
+
+  html += '<span class="tree-label">' + node.name + '</span>';
+
+  if (!isLeaf) {
+    html += '<div class="tree-progress"><div class="tree-progress-fill" style="width:' + prog.pct + '%;background:' + getProgressColor(prog.pct) + '"></div></div>';
+    html += '<span class="tree-pct">' + prog.pct + '%</span>';
+  }
+
+  html += '</div>';
+
+  if (hasChildren) {
+    html += '<div class="tree-children' + (isExpanded ? '' : ' collapsed') + '">';
+    node.children.forEach(function(c) { html += renderTreeNode(c, depth + 1); });
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function treeClick(id) {
+  var node = findNode(id);
+  if (!node) return;
+
+  var hasChildren = node.children && node.children.length > 0;
+  if (hasChildren) {
+    expandedNodes[id] = !expandedNodes[id];
+    selectedId = id;
+  } else {
+    // Leaf: cycle status
+    var idx = STATUSES.indexOf(node.status || 'planned');
+    node.status = STATUSES[(idx + 1) % STATUSES.length];
+    // Select parent
+    var path = findParentPath(id);
+    if (path && path.length > 0) selectedId = path[path.length - 1].id;
+  }
+
+  if (todayMode) {
+    renderToday();
+  }
+  renderTree();
+  renderDetail();
+  updateBreadcrumb();
+}
+
+// ── Render Detail ──
+function renderDetail() {
+  var el = document.getElementById('detail');
+  var node = findNode(selectedId);
+  if (!node) return;
+
+  var children = node.children || [];
+  var prog = getProgress(node);
+  var totalTime = getTotalTime(node);
+  var doneTime = getDoneTime(node);
+
+  var html = '<div class="detail-header">';
+  html += '<div class="detail-title">' + node.name + '</div>';
+  html += '</div>';
+  html += '<div class="detail-stats">';
+  html += '<span><span class="stat-value">' + prog.done + '/' + prog.total + '</span> tasks</span>';
+  html += '<span><span class="stat-value">' + prog.pct + '%</span> complete</span>';
+  html += '<span><span class="stat-value">' + formatTime(doneTime) + '</span> / ' + formatTime(totalTime) + '</span>';
+  html += '</div>';
+
+  // List view
+  html += '<div class="cards-grid' + (currentView !== 'list' ? ' hidden' : '') + '" id="list-view">';
+  children.forEach(function(c) {
+    var isGroup = c.children && c.children.length > 0;
+    var cProg = isGroup ? getProgress(c) : null;
+    var statusClass = isGroup ? '' : ('status-' + (c.status || 'planned'));
+    var statusLabel = isGroup ? (cProg.done + '/' + cProg.total) : STATUS_LABELS[c.status || 'planned'];
+
+    html += '<div class="task-card' + (isGroup ? ' has-children' : '') + '" onclick="cardClick(\'' + c.id + '\')">';
+    html += '<div class="task-type type-' + c.type + '">' + (TYPE_ICONS[c.type] || '📦') + '</div>';
+    html += '<div class="task-info">';
+    html += '<div class="task-name">' + c.name + '</div>';
+    if (isGroup) {
+      html += '<div class="task-meta">' + cProg.pct + '% complete</div>';
+    } else if (c.time) {
+      html += '<div class="task-meta">' + c.time + ' estimated</div>';
+    }
+    html += '</div>';
+    html += '<button class="task-status ' + statusClass + '" onclick="event.stopPropagation();cycleStatus(\'' + c.id + '\')">' + statusLabel + '</button>';
+    if (isGroup) {
+      html += '<span class="task-drill">&#9654;</span>';
+    }
+    html += '</div>';
+  });
+  html += '</div>';
+
+  // Board view
+  html += '<div class="board-view' + (currentView === 'board' ? ' active' : '') + '" id="board-view">';
+  var leaves = [];
+  children.forEach(function(c) {
+    if (c.children && c.children.length > 0) {
+      getLeaves(c).forEach(function(l) { l._parentName = c.name; leaves.push(l); });
+    } else {
+      c._parentName = null;
+      leaves.push(c);
+    }
+  });
+
+  STATUSES.forEach(function(s) {
+    var colClass = s === 'progress' ? 'col-progress' : ('col-' + s);
+    var items = leaves.filter(function(l) { return (l.status || 'planned') === s; });
+    html += '<div class="board-column">';
+    html += '<div class="column-header ' + colClass + '">' + STATUS_LABELS[s] + ' ' + items.length + '</div>';
+    html += '<div class="board-cards">';
+    items.forEach(function(item) {
+      var dotColor = '';
+      if (item.type === 'art') dotColor = '#34a853';
+      else if (item.type === 'anim') dotColor = '#4285f4';
+      else if (item.type === 'script') dotColor = '#9aa0a6';
+      else if (item.type === 'fx') dotColor = '#fbbc04';
+      else dotColor = '#a855f7';
+
+      html += '<div class="board-card" onclick="cycleStatus(\'' + item.id + '\')">';
+      html += '<div class="board-card-name">' + item.name + '</div>';
+      html += '<div class="board-card-meta">';
+      html += '<div class="board-type-dot" style="background:' + dotColor + '"></div>';
+      if (item._parentName) html += '<span>' + item._parentName + '</span>';
+      if (item.time) html += '<span>' + item.time + '</span>';
+      html += '</div></div>';
+    });
+    html += '</div></div>';
+  });
+  html += '</div>';
+
+  el.innerHTML = html;
+}
+
+function cardClick(id) {
+  var node = findNode(id);
+  if (!node) return;
+  if (node.children && node.children.length > 0) {
+    selectedId = id;
+    expandedNodes[id] = true;
+    renderTree();
+    renderDetail();
+    updateBreadcrumb();
+  } else {
+    cycleStatus(id);
+  }
+}
+
+function cycleStatus(id) {
+  var node = findNode(id);
+  if (!node || (node.children && node.children.length > 0)) return;
+  var idx = STATUSES.indexOf(node.status || 'planned');
+  node.status = STATUSES[(idx + 1) % STATUSES.length];
+  renderTree();
+  renderDetail();
+  if (todayMode) renderToday();
+}
+
+// ── Breadcrumb ──
+function updateBreadcrumb() {
+  var path = findParentPath(selectedId);
+  if (!path) path = [];
+  var node = findNode(selectedId);
+  var el = document.getElementById('breadcrumb');
+  var html = '';
+  path.forEach(function(p) {
+    html += '<span onclick="navigateTo(\'' + p.id + '\')">' + p.name + '</span>';
+    html += '<span class="sep">›</span>';
+  });
+  if (node) html += '<span class="current">' + node.name + '</span>';
+  el.innerHTML = html;
+}
+
+function navigateTo(id) {
+  selectedId = id;
+  expandedNodes[id] = true;
+  todayMode = false;
+  document.getElementById('btn-today').classList.remove('active');
+  document.getElementById('detail').classList.remove('hidden');
+  document.getElementById('today-panel').classList.remove('active');
+  renderTree();
+  renderDetail();
+  updateBreadcrumb();
+}
+
+// ── View Toggle ──
+function setView(view) {
+  currentView = view;
+  document.getElementById('btn-list').classList.toggle('active', view === 'list');
+  document.getElementById('btn-board').classList.toggle('active', view === 'board');
+  renderDetail();
+}
+
+// ── Today View ──
+function toggleToday() {
+  todayMode = !todayMode;
+  document.getElementById('btn-today').classList.toggle('active', todayMode);
+  document.getElementById('detail').classList.toggle('hidden', todayMode);
+  document.getElementById('today-panel').classList.toggle('active', todayMode);
+  if (todayMode) renderToday();
+}
+
+function renderToday() {
+  var el = document.getElementById('today-panel');
+  var inProgress = getAllByStatus(data, 'progress');
+  var planned = getAllByStatus(data, 'planned');
+
+  var html = '<div class="detail-header"><div class="detail-title">Today</div></div>';
+  html += '<div class="detail-stats"><span>Focus on what\'s in progress. Click status to advance.</span></div>';
+
+  // In Progress
+  html += '<div class="today-section">';
+  html += '<div class="today-section-label">In Progress (' + inProgress.length + ')</div>';
+  inProgress.forEach(function(task) {
+    var path = findParentPath(task.id);
+    var pathStr = path ? path.slice(1).map(function(p){return p.name}).join(' › ') : '';
+    html += '<div class="today-card" onclick="cycleStatus(\'' + task.id + '\')">';
+    html += '<div class="task-type type-' + task.type + '">' + (TYPE_ICONS[task.type] || '📦') + '</div>';
+    html += '<div class="task-info">';
+    html += '<div class="task-name">' + task.name + '</div>';
+    html += '<div class="today-path">' + pathStr + '</div>';
+    html += '</div>';
+    html += '<button class="task-status status-progress" onclick="event.stopPropagation();cycleStatus(\'' + task.id + '\')">In Progress</button>';
+    if (task.time) html += '<span class="task-time">' + task.time + '</span>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  // Up Next
+  html += '<div class="today-section">';
+  html += '<div class="today-section-label">Up Next (' + Math.min(planned.length, 5) + ' of ' + planned.length + ' planned)</div>';
+  planned.slice(0, 5).forEach(function(task) {
+    var path = findParentPath(task.id);
+    var pathStr = path ? path.slice(1).map(function(p){return p.name}).join(' › ') : '';
+    html += '<div class="today-card" onclick="cycleStatus(\'' + task.id + '\')">';
+    html += '<div class="task-type type-' + task.type + '">' + (TYPE_ICONS[task.type] || '📦') + '</div>';
+    html += '<div class="task-info">';
+    html += '<div class="task-name">' + task.name + '</div>';
+    html += '<div class="today-path">' + pathStr + '</div>';
+    html += '</div>';
+    html += '<button class="task-status status-planned" onclick="event.stopPropagation();cycleStatus(\'' + task.id + '\')">Planned</button>';
+    if (task.time) html += '<span class="task-time">' + task.time + '</span>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  el.innerHTML = html;
+}
+
+// ── Hint ──
+function showHint(msg) {
+  var el = document.getElementById('hint');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+  clearTimeout(window._hintTimer);
+  window._hintTimer = setTimeout(function() { el.classList.add('hidden'); }, 4000);
+}
+
+// ── Init ──
+renderTree();
+renderDetail();
+updateBreadcrumb();
+showHint('Click systems in the tree to explore. Click leaf tasks to cycle status. Try the Today & Board views!');
+</script>
+</body>
+</html>

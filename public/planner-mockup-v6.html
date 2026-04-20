@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Project Planner v6</title>
+<style>
+  @font-face { font-family:'Virgil'; src:url('fonts/Virgil.woff2') format('woff2'); font-display:swap; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#1a1b1e; color:#e8eaed; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; height:100vh; overflow:hidden; display:flex; }
+
+  /* ── Sidebar ── */
+  .sidebar { width:240px; background:#22252b; border-right:1px solid #3c3f47; display:flex; flex-direction:column; flex-shrink:0; overflow-y:auto; z-index:10; }
+  .sb-section { padding:12px 14px; border-bottom:1px solid #2c2f38; }
+  .sb-section-title { font-size:10px; text-transform:uppercase; letter-spacing:1px; color:#5f6368; margin-bottom:8px; font-weight:700; }
+  .sprint-nav { display:flex; align-items:center; gap:6px; margin-bottom:10px; }
+  .sprint-nav-btn { background:none; border:1px solid #3c3f47; color:#9aa0a6; border-radius:4px; width:26px; height:26px; cursor:pointer; font-size:11px; display:flex; align-items:center; justify-content:center; transition:all .15s; }
+  .sprint-nav-btn:hover { border-color:#8ab4f8; color:#8ab4f8; }
+  .sprint-label { flex:1; text-align:center; font-size:13px; font-weight:600; }
+  .sprint-stats-box { background:rgba(138,180,248,.06); border:1px solid rgba(138,180,248,.15); border-radius:8px; padding:8px 10px; margin-bottom:8px; }
+  .sprint-stat-row { display:flex; justify-content:space-between; font-size:11px; color:#9aa0a6; padding:2px 0; }
+  .sprint-stat-row .sval { color:#e8eaed; font-weight:600; }
+  .sprint-board-btn { width:100%; padding:7px 12px; background:rgba(138,180,248,.1); border:1px solid rgba(138,180,248,.25); color:#8ab4f8; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; transition:all .15s; text-align:center; }
+  .sprint-board-btn:hover { background:rgba(138,180,248,.2); border-color:#8ab4f8; }
+  .sprint-board-btn.active { background:rgba(138,180,248,.25); border-color:#8ab4f8; }
+  .ms-header { display:flex; align-items:center; cursor:pointer; gap:6px; padding:2px 0; margin-bottom:6px; }
+  .ms-header:hover .sb-section-title { color:#9aa0a6; }
+  .ms-toggle { font-size:9px; color:#5f6368; transition:transform .2s; }
+  .ms-toggle.collapsed { transform:rotate(-90deg); }
+  .ms-list { display:flex; flex-direction:column; gap:2px; }
+  .ms-list.collapsed { display:none; }
+  .ms-item { display:flex; align-items:center; gap:8px; padding:7px 8px; border-radius:6px; cursor:pointer; transition:all .15s; }
+  .ms-item:hover { background:rgba(255,255,255,.04); }
+  .ms-item.active { background:rgba(138,180,248,.1); }
+  .ms-item-info { flex:1; min-width:0; }
+  .ms-item-name { font-size:12px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ms-item.active .ms-item-name { color:#8ab4f8; }
+  .ms-item-bar { width:100%; height:3px; background:#3c3f47; border-radius:2px; margin-top:3px; }
+  .ms-item-fill { height:100%; border-radius:2px; transition:width .4s; }
+  .ms-item-pct { font-size:10px; color:#5f6368; font-weight:600; flex-shrink:0; }
+  .ms-item.active .ms-item-pct { color:#8ab4f8; }
+
+  /* ── Content Area ── */
+  .content-area { flex:1; position:relative; overflow:hidden; }
+
+  /* ── Floating Stats Pill ── */
+  .stats-pill { position:absolute; top:12px; right:16px; z-index:5; background:#2C2F38; border:1px solid #3c3f47; border-radius:20px; padding:6px 14px; display:flex; align-items:center; gap:12px; font-size:12px; color:#9aa0a6; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+  .stats-pill .sp-val { color:#e8eaed; font-weight:600; }
+  .stats-pill .sp-sep { color:#3c3f47; }
+
+  /* ── Floating Breadcrumb ── */
+  .float-breadcrumb { position:absolute; top:12px; left:16px; z-index:5; background:#2C2F38; border:1px solid #3c3f47; border-radius:20px; padding:6px 14px; display:flex; align-items:center; gap:6px; font-size:12px; color:#9aa0a6; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+  .float-breadcrumb .current { color:#e8eaed; font-weight:500; }
+
+  /* ── Whiteboard Map ── */
+  .map-viewport { width:100%; height:100%; overflow:hidden; cursor:grab; position:relative; }
+  .map-viewport:active { cursor:grabbing; }
+  .map-viewport.hidden { display:none; }
+  .map-inner { position:absolute; min-width:4000px; min-height:4000px; transform-origin:0 0; will-change:transform; }
+  .map-controls { position:absolute; bottom:16px; right:16px; z-index:5; display:flex; gap:4px; background:#2C2F38; border:1px solid #3c3f47; border-radius:8px; padding:4px; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+  .map-ctrl-btn { width:30px; height:30px; border:none; background:none; color:#9aa0a6; cursor:pointer; border-radius:4px; font-size:14px; display:flex; align-items:center; justify-content:center; transition:all .15s; }
+  .map-ctrl-btn:hover { background:rgba(255,255,255,.06); color:#e8eaed; }
+  .map-zoom-label { font-size:11px; color:#5f6368; display:flex; align-items:center; padding:0 6px; }
+
+  /* ── Canvas Node (absolutely positioned) ── */
+  .canvas-node { position:absolute; }
+
+  /* ── Frame (canvas container) ── */
+  .canvas-frame { border:1px solid #3c3f47; border-radius:16px; background:rgba(255,255,255,.01); overflow:visible; transition:border-color .2s, box-shadow .2s; }
+  .canvas-frame.drop-highlight { border-color:#8ab4f8; background:rgba(138,180,248,.04); box-shadow:0 0 20px rgba(138,180,248,.15); }
+  .frame-drag-bar { padding:6px 20px 2px; cursor:grab; user-select:none; display:flex; align-items:center; min-height:24px; }
+  .frame-drag-bar:active { cursor:grabbing; }
+  .frame-label { font-size:11px; color:#5f6368; text-transform:uppercase; letter-spacing:1px; pointer-events:none; }
+  .frame-body { display:flex; gap:16px; flex-wrap:wrap; padding:8px 18px 14px; }
+  .frame-note { font-size:11px; color:#5f6368; font-style:italic; padding:0 18px 10px; text-align:center; }
+
+  /* ── Standalone Node ── */
+  .standalone-node { background:#2a2d35; border:2px solid #4a4d55; border-radius:12px; padding:14px 18px; text-align:center; cursor:grab; transition:all .2s; }
+  .standalone-node:hover { border-color:#8ab4f8; box-shadow:0 4px 16px rgba(0,0,0,.3); }
+  .root-name { font-size:15px; font-weight:700; margin-bottom:6px; }
+  .root-progress-bar { height:5px; background:#3c3f47; border-radius:3px; overflow:hidden; }
+  .root-progress-fill { height:100%; border-radius:3px; }
+  .root-pct { font-size:11px; color:#9aa0a6; margin-top:4px; }
+
+  /* ── System Box ── */
+  .system-box { background:#23262e; border:1px solid #3c3f47; border-radius:10px; min-width:210px; max-width:320px; flex:1; overflow:visible; transition:all .2s; position:relative; }
+  .system-box.drop-highlight { border-color:#8ab4f8; box-shadow:0 0 12px rgba(138,180,248,.3); }
+  .system-box-header { padding:10px 12px 6px; display:flex; align-items:center; gap:8px; cursor:grab; transition:background .15s; user-select:none; }
+  .system-box-header:active { cursor:grabbing; }
+  .system-box-name { font-size:13px; font-weight:600; flex:1; pointer-events:none; }
+  .system-box-badge { font-size:10px; padding:2px 6px; border-radius:8px; font-weight:600; pointer-events:none; }
+  .system-box-progress { height:3px; background:#3c3f47; margin:0 12px 8px; border-radius:2px; overflow:hidden; }
+  .system-box-progress-fill { height:100%; border-radius:2px; }
+  .system-box-body { padding:0 12px 10px; }
+  .system-box-time { font-size:10px; color:#5f6368; padding:5px 12px 8px; border-top:1px solid rgba(255,255,255,.04); display:flex; justify-content:space-between; }
+
+  /* ── Loose System (standalone on canvas) ── */
+  .loose-system { overflow:visible; }
+  .loose-system .system-box { max-width:none; }
+
+  /* ── Sub-group ── */
+  .sub-group { background:rgba(255,255,255,.03); border:1px solid #3c3f47; border-radius:8px; margin-bottom:6px; overflow:hidden; transition:all .15s; position:relative; }
+  .sub-group.drop-highlight { border-color:#8ab4f8; background:rgba(138,180,248,.06); }
+  .sub-group-header { display:flex; align-items:center; gap:6px; padding:6px 8px; cursor:grab; user-select:none; }
+  .sub-group-header:active { cursor:grabbing; }
+  .sub-group-name { font-size:11px; font-weight:600; flex:1; color:#bdc1c6; pointer-events:none; }
+  .sub-group-badge { font-size:10px; padding:1px 5px; border-radius:6px; font-weight:600; pointer-events:none; }
+  .sub-group-items { padding:0 8px 6px; }
+
+  /* ── Task items — Virgil font + icon ── */
+  .task-item { display:flex; align-items:center; gap:6px; padding:3px 4px; font-size:12px; cursor:grab; transition:opacity .15s; border-radius:3px; user-select:none; }
+  .task-item:hover { background:rgba(255,255,255,.04); }
+  .task-item .task-icon { width:16px; height:16px; border-radius:3px; flex-shrink:0; image-rendering:auto; pointer-events:none; }
+  .task-item .task-name { flex:1; color:#9aa0a6; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-family:'Virgil','Segoe Print',cursive; font-size:15px; font-weight:400; line-height:1.2; pointer-events:none; }
+  .task-item .task-name.done { color:#5f6368; text-decoration:line-through; }
+  .task-item .task-sprint { font-size:9px; color:#5f6368; flex-shrink:0; font-family:-apple-system,sans-serif; pointer-events:none; }
+
+  /* ── Loose Task on canvas ── */
+  .loose-task { display:flex; align-items:center; gap:8px; padding:8px 14px; background:#23262e; border:1px solid #3c3f47; border-radius:8px; cursor:grab; min-width:140px; transition:all .2s; }
+  .loose-task:hover { border-color:#5f6368; background:#292c34; }
+  .loose-task .task-icon { width:18px; height:18px; border-radius:3px; flex-shrink:0; }
+  .loose-task .task-name { font-family:'Virgil','Segoe Print',cursive; font-size:16px; color:#9aa0a6; white-space:nowrap; }
+
+  /* ── Drag ghost ── */
+  #drag-ghost { position:fixed; pointer-events:none; z-index:10000; opacity:.85; box-shadow:0 12px 32px rgba(0,0,0,.5); border-radius:10px; transform:rotate(1deg) scale(1.02); transition:none; }
+
+  /* ── Drag states ── */
+  .canvas-dragging { opacity:.25 !important; }
+
+  /* ── Drop highlight ── */
+  .drop-highlight { outline:2px dashed #8ab4f8; outline-offset:2px; }
+
+  /* ── Resize handles ── */
+  .resize-handle { position:absolute; z-index:5; }
+  .resize-r { right:-5px; top:16px; bottom:16px; width:10px; cursor:ew-resize; border-radius:3px; }
+  .resize-b { bottom:-5px; left:16px; right:16px; height:10px; cursor:ns-resize; border-radius:3px; }
+  .resize-rb { right:-6px; bottom:-6px; width:16px; height:16px; cursor:nwse-resize; border-radius:6px; }
+  .resize-handle:hover { background:rgba(138,180,248,.25); }
+
+  /* ── Context Menu ── */
+  .context-menu { position:fixed; background:#2c2f38; border:1px solid #3c3f47; border-radius:8px; padding:4px; z-index:10001; box-shadow:0 4px 16px rgba(0,0,0,.4); min-width:170px; }
+  .ctx-item { padding:8px 14px; font-size:12px; color:#e8eaed; cursor:pointer; border-radius:5px; transition:background .1s; display:flex; align-items:center; gap:8px; }
+  .ctx-item:hover { background:rgba(138,180,248,.15); color:#8ab4f8; }
+  .ctx-sep { height:1px; background:#3c3f47; margin:4px 2px; }
+
+  /* Color classes */
+  .prog-done { background:rgba(52,168,83,.15); color:#34a853; }
+  .prog-high { background:rgba(138,180,248,.15); color:#8ab4f8; }
+  .prog-mid { background:rgba(251,188,4,.15); color:#fbbc04; }
+  .prog-low { background:rgba(154,160,166,.1); color:#9aa0a6; }
+
+  /* ── Board View ── */
+  .board-view { width:100%; height:100%; overflow-y:auto; padding:20px 28px; display:none; }
+  .board-view.active { display:block; }
+  .board-header { display:flex; align-items:center; gap:14px; margin-bottom:4px; flex-wrap:wrap; }
+  .board-back { background:none; border:1px solid #3c3f47; color:#9aa0a6; border-radius:6px; padding:5px 10px; cursor:pointer; font-size:12px; transition:all .15s; display:flex; align-items:center; gap:5px; }
+  .board-back:hover { border-color:#8ab4f8; color:#8ab4f8; }
+  .board-title { font-size:20px; font-weight:700; }
+  .board-subtitle { font-size:12px; color:#5f6368; }
+  .board-stats { font-size:12px; color:#9aa0a6; margin-bottom:10px; }
+  .board-stats .val { color:#e8eaed; font-weight:600; }
+  .board-month-nav { display:flex; align-items:center; gap:10px; margin-bottom:14px; padding:6px 0; border-bottom:1px solid #3c3f47; }
+  .bm-btn { background:none; border:1px solid #3c3f47; color:#9aa0a6; border-radius:4px; padding:3px 8px; cursor:pointer; font-size:12px; transition:all .15s; }
+  .bm-btn:hover { border-color:#5f6368; color:#e8eaed; }
+  .bm-label { font-size:13px; font-weight:600; min-width:100px; text-align:center; }
+
+  /* ── Kanban ── */
+  .kanban { display:flex; gap:12px; overflow-x:auto; padding-bottom:20px; min-height:400px; }
+  .kanban-col { min-width:220px; flex:1; display:flex; flex-direction:column; }
+  .kanban-col-header { padding:7px 12px; border-radius:8px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px; text-align:center; }
+  .kh-planned { background:rgba(154,160,166,.1); color:#9aa0a6; }
+  .kh-progress { background:rgba(66,133,244,.15); color:#4285f4; }
+  .kh-testing { background:rgba(251,188,4,.15); color:#fbbc04; }
+  .kh-done { background:rgba(52,168,83,.15); color:#34a853; }
+  .kanban-cards { display:flex; flex-direction:column; gap:6px; flex:1; min-height:60px; border-radius:8px; padding:4px; transition:background .15s; }
+  .kanban-cards.drag-over { background:rgba(138,180,248,.08); outline:2px dashed rgba(138,180,248,.3); outline-offset:-2px; }
+  .kanban-card { padding:9px 12px; background:#23262e; border:1px solid #3c3f47; border-radius:8px; cursor:grab; transition:all .15s; position:relative; }
+  .kanban-card:hover { border-color:#5f6368; background:#292c34; }
+  .kanban-card.dragging { opacity:.3; transform:scale(.95); }
+  .kanban-card-top { display:flex; align-items:center; gap:7px; margin-bottom:3px; }
+  .kanban-card-name { font-size:12px; font-weight:500; flex:1; }
+  .kanban-card-icon { width:18px; height:18px; border-radius:4px; flex-shrink:0; }
+  .kanban-card-meta { display:flex; align-items:center; gap:8px; font-size:10px; color:#5f6368; flex-wrap:wrap; }
+  .kanban-card-system { color:#5f6368; background:rgba(255,255,255,.05); padding:1px 5px; border-radius:3px; font-size:9px; }
+  .kanban-card-parent { color:#80868b; }
+  .kanban-card-actions { display:flex; align-items:center; gap:5px; margin-top:5px; }
+  .assign-btn { font-size:9px; padding:2px 5px; border-radius:4px; border:1px solid #3c3f47; background:none; color:#5f6368; cursor:pointer; transition:all .15s; }
+  .assign-btn:hover { border-color:#8ab4f8; color:#8ab4f8; }
+  .assign-btn.assigned { border-color:#8ab4f8; color:#8ab4f8; background:rgba(138,180,248,.1); }
+  .kanban-empty { font-size:11px; color:#3c3f47; text-align:center; padding:16px 0; font-style:italic; }
+  .drop-indicator { height:2px; background:#8ab4f8; border-radius:1px; margin:-1px 4px; pointer-events:none; box-shadow:0 0 6px rgba(138,180,248,.5); }
+</style>
+</head>
+<body>
+
+<div class="sidebar" id="sidebar"></div>
+<div class="content-area">
+  <div class="float-breadcrumb" id="float-breadcrumb"></div>
+  <div class="stats-pill" id="stats-pill"></div>
+  <div class="map-viewport" id="map-viewport">
+    <div class="map-inner" id="map-inner"></div>
+    <div class="map-controls">
+      <button class="map-ctrl-btn" onclick="zoomAtCenter(-0.1)">&#8722;</button>
+      <div class="map-zoom-label" id="zoom-label">100%</div>
+      <button class="map-ctrl-btn" onclick="zoomAtCenter(0.1)">+</button>
+      <button class="map-ctrl-btn" onclick="resetMapView()" style="font-size:11px;">&#x27F2;</button>
+    </div>
+  </div>
+  <div class="board-view" id="board-view"></div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════
+   CONSTANTS & DATA
+   ═══════════════════════════════════════ */
+var STATUSES=['planned','progress','testing','done'];
+var STATUS_LABELS={planned:'Planned',progress:'In Progress',testing:'Testing',done:'Done'};
+var MONTH_NAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var TYPE_ICON_FILES={art:'icons/Art.png',anim:'icons/Animations.png',script:'icons/Scripts.png',fx:'icons/Effects.png',rig:'icons/Rig.png',scene:'icons/Scene.png',props:'icons/Properties.png',ui:'icons/Scripts.png',prefab:'icons/Properties.png',system:'icons/Scripts.png'};
+
+var activeMilestoneIdx=0;
+var boardMonth={year:2026,month:3};
+var currentBoardId=null,currentBoardPath=null,isSprintOverview=false,msCollapsed=false;
+var mapPan={x:0,y:0},mapZoom=1;
+var taskOrder={};
+var CLICK_THRESHOLD=5;
+
+function monthKey(y,m){return y+'-'+m}
+function monthLabel(y,m){return MONTH_NAMES[m]+' '+y}
+function sprintShort(key){if(!key)return'';var p=key.split('-');return MONTH_NAMES[parseInt(p[1])]}
+
+var milestones=[
+  {id:'ms1',name:'Milestone 1: Basic Melee Enemy Combat',looseSystems:[],looseTasks:[],frames:[
+    {id:'f0',standalone:true,systems:[{id:'kairos-char',name:'Kairos (Character)',children:[
+      {id:'k-art',name:'Artwork',type:'art',status:'done',time:'2h',sprint:'2026-0',completedAt:'2026-0'},
+      {id:'k-rig',name:'Spine2D Rig',type:'rig',status:'done',time:'4h',sprint:'2026-0',completedAt:'2026-0'},
+      {id:'k-move',name:'Move Anim',type:'anim',status:'done',time:'2h',sprint:'2026-0',completedAt:'2026-1'},
+      {id:'k-idle',name:'Idle Anim',type:'anim',status:'done',time:'2h',sprint:'2026-1',completedAt:'2026-1'},
+      {id:'k-script',name:'Player Script',type:'script',status:'done',time:'3h',sprint:'2026-1',completedAt:'2026-1'},
+    ]}]},
+    {id:'f1',label:'Core Systems',note:'Can be worked in parallel',systems:[
+      {id:'card-sys',name:'Card System',children:[
+        {id:'card',name:'Card',type:'system',isGroup:true,children:[
+          {id:'c-props',name:'Properties',type:'props',status:'done',time:'1h',sprint:'2026-1',completedAt:'2026-1'},
+          {id:'c-canplay',name:'CanPlay Condition',type:'script',status:'done',time:'1h',sprint:'2026-1',completedAt:'2026-1'},
+          {id:'c-onplay',name:'OnPlay',type:'script',status:'done',time:'2h',sprint:'2026-1',completedAt:'2026-2'},
+          {id:'c-ondraw',name:'OnDraw',type:'script',status:'done',time:'1h',sprint:'2026-2',completedAt:'2026-2'},
+          {id:'c-ondiscard',name:'OnDiscard',type:'script',status:'done',time:'1h',sprint:'2026-2',completedAt:'2026-2'},
+        ]},
+        {id:'card-mgr',name:'Card Manager',type:'system',isGroup:true,children:[
+          {id:'cm-deck',name:'Deck Pile',type:'script',status:'done',time:'2h',sprint:'2026-2',completedAt:'2026-2'},
+          {id:'cm-discard',name:'Discard Pile',type:'script',status:'done',time:'1h',sprint:'2026-2',completedAt:'2026-2'},
+          {id:'cm-draw',name:'Draw Card',type:'script',status:'done',time:'2h',sprint:'2026-2',completedAt:'2026-2'},
+          {id:'cm-discard2',name:'Discard Card',type:'script',status:'done',time:'1h',sprint:'2026-2',completedAt:'2026-2'},
+          {id:'cm-shuffle',name:'Shuffle Deck',type:'script',status:'done',time:'1h',sprint:'2026-2',completedAt:'2026-2'},
+          {id:'cm-hand',name:'Hand Pile Logic',type:'script',status:'progress',time:'3h',sprint:'2026-3',completedAt:null},
+          {id:'cm-play',name:'Play Card',type:'script',status:'progress',time:'2h',sprint:'2026-3',completedAt:null},
+        ]},
+        {id:'cs-draw-anim',name:'Card Draw Anim',type:'anim',status:'done',time:'2h',sprint:'2026-2',completedAt:'2026-2'},
+        {id:'cs-stack-anim',name:'Card Stack Anim',type:'anim',status:'done',time:'1h',sprint:'2026-2',completedAt:'2026-2'},
+        {id:'cs-play-anim',name:'Card Play Anim',type:'anim',status:'done',time:'2h',sprint:'2026-2',completedAt:'2026-3'},
+        {id:'cs-hover-anim',name:'Card Hover Anim',type:'anim',status:'done',time:'1h',sprint:'2026-3',completedAt:'2026-3'},
+        {id:'cs-playable',name:'Card Playable Anim',type:'anim',status:'progress',time:'2h',sprint:'2026-3',completedAt:null},
+        {id:'cs-hover-logic',name:'Card Hover Logic',type:'script',status:'done',time:'2h',sprint:'2026-3',completedAt:'2026-3'},
+        {id:'cs-hand-ui',name:'UI Hand Placement',type:'ui',status:'done',time:'3h',sprint:'2026-3',completedAt:'2026-3'},
+        {id:'cs-hover-desc',name:'Hover Description',type:'ui',status:'planned',time:'2h',sprint:'2026-3',completedAt:null},
+      ]},
+      {id:'grid-sys',name:'Grid System',children:[
+        {id:'grid-mgr',name:'Grid Manager',type:'system',isGroup:true,children:[
+          {id:'gm-pos',name:'GetGridPos',type:'script',status:'done',time:'1h',sprint:'2026-1',completedAt:'2026-1'},
+          {id:'gm-reg',name:'RegisterUnit',type:'script',status:'done',time:'1h',sprint:'2026-1',completedAt:'2026-1'},
+          {id:'gm-unreg',name:'UnRegisterUnit',type:'script',status:'done',time:'1h',sprint:'2026-1',completedAt:'2026-1'},
+          {id:'gm-gen',name:'GenerateGrid',type:'script',status:'done',time:'2h',sprint:'2026-1',completedAt:'2026-2'},
+          {id:'gm-dir',name:'GetMouseDir',type:'script',status:'done',time:'1h',sprint:'2026-2',completedAt:'2026-2'},
+          {id:'gm-coord',name:'GetMouseCoord',type:'script',status:'done',time:'1h',sprint:'2026-2',completedAt:'2026-2'},
+        ]},
+        {id:'player-tile',name:'Player Tile',type:'system',isGroup:true,children:[
+          {id:'pt-move',name:'Move Clip To Grid',type:'anim',status:'done',time:'2h',sprint:'2026-2',completedAt:'2026-2'},
+          {id:'pt-fx',name:'Effect',type:'fx',status:'done',time:'1h',sprint:'2026-2',completedAt:'2026-2'},
+          {id:'pt-pulse',name:'Pulse Animation',type:'anim',status:'done',time:'1h',sprint:'2026-2',completedAt:'2026-2'},
+        ]},
+        {id:'enemy-tile',name:'Enemy Tile',type:'system',isGroup:true,children:[
+          {id:'et-enable',name:'Enable',type:'script',status:'done',time:'1h',sprint:'2026-2',completedAt:'2026-2'},
+          {id:'et-fx',name:'Effect',type:'fx',status:'done',time:'1h',sprint:'2026-2',completedAt:'2026-2'},
+          {id:'et-pulse',name:'Pulse Animation',type:'anim',status:'done',time:'1h',sprint:'2026-2',completedAt:'2026-3'},
+        ]},
+      ]}
+    ]},
+    {id:'f2',label:'Content & Combat',note:'Can be worked in parallel',systems:[
+      {id:'enemy-sys',name:'Enemy System',children:[
+        {id:'enemy1',name:'Enemy 1',type:'system',isGroup:true,children:[
+          {id:'e1-art',name:'Artwork',type:'art',status:'done',time:'15m',sprint:'2026-3',completedAt:'2026-3'},
+          {id:'e1-props',name:'Properties',type:'props',status:'done',time:'15m',sprint:'2026-3',completedAt:'2026-3'},
+        ]},
+        {id:'enemy-heart',name:'Enemy Heart UI',type:'system',isGroup:true,children:[
+          {id:'eh-art',name:'Artwork',type:'art',status:'progress',time:'1h',sprint:'2026-3',completedAt:null},
+          {id:'eh-hit',name:'OnHit Animation',type:'anim',status:'planned',time:'1h',sprint:'2026-3',completedAt:null},
+          {id:'eh-scale',name:'Scale/Fill Follow Logic',type:'script',status:'planned',time:'1h',sprint:null,completedAt:null},
+        ]},
+        {id:'es-onhit',name:'Global On Hit Anim',type:'anim',status:'planned',time:'45m',sprint:null,completedAt:null},
+        {id:'es-attack',name:'Global Attack Anim',type:'anim',status:'planned',time:'45m',sprint:null,completedAt:null},
+        {id:'es-death',name:'Global Death Anim',type:'anim',status:'planned',time:'30m',sprint:null,completedAt:null},
+        {id:'enemy-intent',name:'Enemy Intent Indicator',type:'system',isGroup:true,children:[
+          {id:'ei-atk',name:'Attack Intent',type:'art',status:'planned',time:'30m',sprint:null,completedAt:null},
+          {id:'ei-def',name:'Defend Intent',type:'art',status:'planned',time:'30m',sprint:null,completedAt:null},
+          {id:'ei-buff',name:'Buff Intent',type:'art',status:'planned',time:'30m',sprint:null,completedAt:null},
+        ]},
+      ]},
+      {id:'kairos-basic',name:'Kairos Basic Card',children:[
+        {id:'kb-art',name:'Card Artwork',type:'art',status:'planned',time:'2h',sprint:null,completedAt:null},
+        {id:'kb-atk1',name:'Kairos Attack Anim 1',type:'anim',status:'planned',time:'1.5h',sprint:null,completedAt:null},
+        {id:'kb-atk2',name:'Kairos Attack Anim 2',type:'anim',status:'planned',time:'1.5h',sprint:null,completedAt:null},
+        {id:'kb-trans',name:'Anim State Transition',type:'anim',status:'planned',time:'1h',sprint:null,completedAt:null},
+        {id:'kb-fx',name:'Card Attack Effect',type:'fx',status:'planned',time:'1h',sprint:null,completedAt:null},
+        {id:'kb-logic',name:'Attack Card Logic',type:'script',status:'planned',time:'1h',sprint:null,completedAt:null},
+      ]},
+      {id:'health-mana',name:'Health & Mana',children:[
+        {id:'hm-hart',name:'Health Artwork',type:'art',status:'done',time:'1h',sprint:'2026-3',completedAt:'2026-3'},
+        {id:'hm-mart',name:'Mana Artwork',type:'art',status:'done',time:'1h',sprint:'2026-3',completedAt:'2026-3'},
+        {id:'hm-manim',name:'Mana Animation',type:'anim',status:'progress',time:'2h',sprint:'2026-3',completedAt:null},
+      ]}
+    ]},
+    {id:'f3',label:'Abilities & Effects',note:'Can be worked in parallel',systems:[
+      {id:'kairos-prune',name:'Kairos Prune Ability',children:[
+        {id:'kp-chan',name:'Kairos Channel Animation',type:'anim',status:'progress',time:'2h',sprint:'2026-3',completedAt:null},
+        {id:'kp-prune',name:'Kairos Prune Animation',type:'anim',status:'progress',time:'2h',sprint:'2026-3',completedAt:null},
+        {id:'kp-blast',name:'Kairos Prune Blast',type:'fx',status:'planned',time:'1h',sprint:null,completedAt:null},
+        {id:'kp-pruning',name:'Card Pruning Animation',type:'anim',status:'planned',time:'1h',sprint:null,completedAt:null},
+        {id:'kp-pruned',name:'Card Pruned Animation',type:'anim',status:'planned',time:'1h',sprint:null,completedAt:null},
+        {id:'kp-logic',name:'Kairos Prune Logic',type:'script',status:'planned',time:'1.5h',sprint:null,completedAt:null},
+        {id:'kp-tile',name:'Kairos Prune Tile',type:'prefab',status:'planned',time:'30m',sprint:null,completedAt:null},
+        {id:'kp-tlogic',name:'Kairos Prune Tile Logic',type:'script',status:'planned',time:'1h',sprint:null,completedAt:null},
+      ]},
+      {id:'kairos-bonk',name:'Kairos Bonk Card',children:[
+        {id:'kbk-art',name:'Card Artwork',type:'art',status:'planned',time:'1h',sprint:null,completedAt:null},
+        {id:'kbk-fx',name:'Card Attack Effect',type:'fx',status:'planned',time:'1h',sprint:null,completedAt:null},
+        {id:'kbk-logic',name:'Bonk Card Logic',type:'script',status:'planned',time:'1h',sprint:null,completedAt:null},
+      ]},
+      {id:'kairos-fx',name:'Kairos (Effects)',children:[
+        {id:'kfx-hit',name:'On Hit Animation',type:'anim',status:'planned',time:'2h',sprint:null,completedAt:null},
+        {id:'kfx-death',name:'Death Animation',type:'anim',status:'planned',time:'2h',sprint:null,completedAt:null},
+        {id:'kfx-unplay',name:'Card Unplayable Animation',type:'anim',status:'progress',time:'1h',sprint:'2026-3',completedAt:null},
+      ]}
+    ]}
+  ]},
+  {id:'ms2',name:'Milestone 2: Dungeon Traversal & More Enemies',looseSystems:[],looseTasks:[],frames:[
+    {id:'f2-enemies',label:'Enemies',systems:[
+      {id:'enemy2-ranged',name:'Enemy 2 Ranged',children:[
+        {id:'e2-art',name:'Artwork',type:'art',status:'planned',time:'3h',sprint:null,completedAt:null},
+        {id:'e2-logic',name:'Enemy Logic',type:'script',status:'planned',time:'3h',sprint:null,completedAt:null},
+        {id:'e2-ncb',name:'Non-Combat Behavior',type:'script',status:'planned',time:'2h',sprint:null,completedAt:null},
+      ]},
+      {id:'enemy3-zoner',name:'Enemy 3 Zoner',children:[
+        {id:'e3-art',name:'Artwork',type:'art',status:'planned',time:'3h',sprint:null,completedAt:null},
+        {id:'e3-logic',name:'Enemy Logic',type:'script',status:'planned',time:'3h',sprint:null,completedAt:null},
+        {id:'e3-zone',name:'Zone Indicator Effect',type:'fx',status:'planned',time:'1h',sprint:null,completedAt:null},
+      ]},
+      {id:'enemy4',name:'Enemy 4 ??',children:[
+        {id:'e4-art',name:'Artwork',type:'art',status:'planned',time:'3h',sprint:null,completedAt:null},
+        {id:'e4-logic',name:'Enemy Logic',type:'script',status:'planned',time:'3h',sprint:null,completedAt:null},
+      ]}
+    ]},
+    {id:'f2-ai',label:'Enemy AI',systems:[{id:'enemy-ncb',name:'Enemy Non-Combat Behavior',children:[
+      {id:'ncb-patrol',name:'Patrol',type:'script',status:'planned',time:'2h',sprint:null,completedAt:null},
+      {id:'ncb-aggro',name:'Aggro',type:'script',status:'planned',time:'2h',sprint:null,completedAt:null},
+      {id:'ncb-deaggro',name:'De-Aggro',type:'script',status:'planned',time:'1h',sprint:null,completedAt:null},
+      {id:'ncb-combat',name:'Combat Atk Initiator',type:'script',status:'planned',time:'2h',sprint:null,completedAt:null},
+      {id:'ncb-path',name:'Pathfinding',type:'script',status:'planned',time:'3h',sprint:null,completedAt:null},
+    ]}]},
+    {id:'f2-rooms',label:'Room System',systems:[{id:'room-sys',name:'Room System',children:[
+      {id:'rm-gen',name:'Generate Grid Placement',type:'script',status:'planned',time:'3h',sprint:null,completedAt:null},
+      {id:'rm-rest',name:'Rest Site',type:'system',isGroup:true,children:[
+        {id:'rest-scene',name:'Scene Building',type:'scene',status:'planned',time:'3h',sprint:null,completedAt:null},
+        {id:'rest-art',name:'Scene Related Artwork',type:'art',status:'planned',time:'2h',sprint:null,completedAt:null},
+        {id:'rest-heal',name:'Heal',type:'script',status:'planned',time:'1h',sprint:null,completedAt:null},
+      ]},
+      {id:'rm-enemy',name:'Enemy Site',type:'system',isGroup:true,children:[
+        {id:'esite-scene',name:'Scene Building',type:'scene',status:'planned',time:'3h',sprint:null,completedAt:null},
+        {id:'esite-art',name:'Scene Related Art',type:'art',status:'planned',time:'2h',sprint:null,completedAt:null},
+      ]},
+      {id:'rm-event',name:'Event Site',type:'system',isGroup:true,children:[
+        {id:'event-scene',name:'Scene Building',type:'scene',status:'planned',time:'3h',sprint:null,completedAt:null},
+        {id:'event-art',name:'Scene Related Art',type:'art',status:'planned',time:'2h',sprint:null,completedAt:null},
+      ]},
+    ]}]},
+    {id:'f2-cards',label:'New Cards',systems:[
+      {id:'kairos-rush',name:'Kairos Rush Card',children:[
+        {id:'kr-art',name:'Card Artwork',type:'art',status:'planned',time:'1.5h',sprint:null,completedAt:null},
+        {id:'kr-logic',name:'Rush Card Logic',type:'script',status:'planned',time:'1.5h',sprint:null,completedAt:null},
+        {id:'kr-fx',name:'Card Attack Effect',type:'fx',status:'planned',time:'1h',sprint:null,completedAt:null},
+      ]},
+      {id:'power-card',name:'Power Card',children:[
+        {id:'pc-art',name:'Card Artwork',type:'art',status:'planned',time:'1.5h',sprint:null,completedAt:null},
+        {id:'pc-fx',name:'Card Attack Effect',type:'fx',status:'planned',time:'1h',sprint:null,completedAt:null},
+        {id:'pc-logic',name:'Power Logic',type:'script',status:'planned',time:'1.5h',sprint:null,completedAt:null},
+      ]},
+      {id:'def-skill',name:'Defensive Skill Card',children:[
+        {id:'ds-art',name:'Card Artwork',type:'art',status:'planned',time:'1.5h',sprint:null,completedAt:null},
+        {id:'ds-fx',name:'Card Attack Effect',type:'fx',status:'planned',time:'1h',sprint:null,completedAt:null},
+        {id:'ds-logic',name:'Skill Logic',type:'script',status:'planned',time:'1.5h',sprint:null,completedAt:null},
+      ]},
+      {id:'draw-card',name:'Card Draw Card',children:[
+        {id:'dc-art',name:'Card Artwork',type:'art',status:'planned',time:'1.5h',sprint:null,completedAt:null},
+        {id:'dc-fx',name:'Card Attack Effect',type:'fx',status:'planned',time:'1h',sprint:null,completedAt:null},
+        {id:'dc-logic',name:'Draw Card Logic',type:'script',status:'planned',time:'1.5h',sprint:null,completedAt:null},
+      ]},
+    ]},
+    {id:'f2-equip',label:'Equipment',systems:[
+      {id:'equip1',name:'Equipment 1 (Relic)',children:[
+        {id:'eq1-art',name:'Artwork',type:'art',status:'planned',time:'1h',sprint:null,completedAt:null},
+        {id:'eq1-int',name:'Integration',type:'script',status:'planned',time:'1h',sprint:null,completedAt:null},
+      ]},
+      {id:'equip2',name:'Equipment 2 (Relic)',children:[
+        {id:'eq2-art',name:'Artwork',type:'art',status:'planned',time:'1h',sprint:null,completedAt:null},
+        {id:'eq2-int',name:'Integration',type:'script',status:'planned',time:'1h',sprint:null,completedAt:null},
+      ]}
+    ]},
+    {id:'f2-ui',label:'UI & Systems',systems:[
+      {id:'dialogue-sys',name:'Dialogue',children:[
+        {id:'dlg-box',name:'Dialogue Box',type:'ui',status:'planned',time:'2h',sprint:null,completedAt:null},
+        {id:'dlg-anim',name:'Dialogue Animations',type:'anim',status:'planned',time:'3h',sprint:null,completedAt:null},
+      ]},
+      {id:'choice-sys',name:'Choice/Reward System',children:[
+        {id:'ch-option',name:'Card Choice Option',type:'ui',status:'planned',time:'1h',sprint:null,completedAt:null},
+        {id:'ch-preview',name:'Card Choice Preview',type:'ui',status:'planned',time:'1h',sprint:null,completedAt:null},
+        {id:'ch-anim',name:'Card Choice Anim',type:'anim',status:'planned',time:'1h',sprint:null,completedAt:null},
+      ]}
+    ]},
+    {id:'f2-exp',systems:[{id:'experimental',name:'Experimental',children:[
+      {id:'exp-1',name:'Experimental Feature',type:'script',status:'planned',time:'5h',sprint:null,completedAt:null},
+    ]}]}
+  ]}
+];
+
+/* ═══════════════════════════════════════
+   HELPERS
+   ═══════════════════════════════════════ */
+function activeMilestone(){return milestones[activeMilestoneIdx]}
+function getLeaves(n){if(!n.children||!n.children.length)return[n];var r=[];n.children.forEach(function(c){r=r.concat(getLeaves(c))});return r}
+function getProgress(n){var l=getLeaves(n);if(!l.length)return{done:0,total:0,pct:0};var d=l.filter(function(x){return x.status==='done'}).length;return{done:d,total:l.length,pct:Math.round(d/l.length*100)}}
+function parseTime(t){if(!t)return 0;if(t.indexOf('h')>-1)return parseFloat(t)*60;if(t.indexOf('m')>-1)return parseFloat(t);return 0}
+function formatTime(m){if(m>=60){var h=Math.floor(m/60);var mm=m%60;return mm>0?h+'h '+mm+'m':h+'h'}return m+'m'}
+function getTotalTime(n){var l=getLeaves(n);var t=0;l.forEach(function(x){t+=parseTime(x.time)});return t}
+function getDoneTime(n){var l=getLeaves(n);var t=0;l.forEach(function(x){if(x.status==='done')t+=parseTime(x.time)});return t}
+function getProgressColor(p){if(p===100)return'#34a853';if(p>=50)return'#8ab4f8';if(p>0)return'#fbbc04';return'#5f6368'}
+function getProgressClass(p){if(p===100)return'prog-done';if(p>=50)return'prog-high';if(p>0)return'prog-mid';return'prog-low'}
+function escHtml(s){return s.replace(/'/g,"\\'").replace(/"/g,'&quot;')}
+function iconFor(type){return TYPE_ICON_FILES[type]||TYPE_ICON_FILES.script}
+
+function getAllLeaves(ms){
+  ms=ms||activeMilestone();var a=[];
+  ms.frames.forEach(function(f){f.systems.forEach(function(s){a=a.concat(getLeaves(s))})});
+  (ms.looseSystems||[]).forEach(function(s){a=a.concat(getLeaves(s))});
+  (ms.looseTasks||[]).forEach(function(t){a.push(t)});
+  return a;
+}
+function findInNode(id,node){if(node.id===id)return node;if(node.children)for(var k=0;k<node.children.length;k++){var f=findInNode(id,node.children[k]);if(f)return f}return null}
+function findTask(id,ms){
+  ms=ms||activeMilestone();
+  for(var i=0;i<ms.frames.length;i++)for(var j=0;j<ms.frames[i].systems.length;j++){var f=findInNode(id,ms.frames[i].systems[j]);if(f)return f}
+  var ls=ms.looseSystems||[];for(var i=0;i<ls.length;i++){var f=findInNode(id,ls[i]);if(f)return f}
+  var lt=ms.looseTasks||[];for(var i=0;i<lt.length;i++){if(lt[i].id===id)return lt[i]}
+  return null;
+}
+function findSystemForTask(tid,ms){
+  ms=ms||activeMilestone();
+  for(var i=0;i<ms.frames.length;i++)for(var j=0;j<ms.frames[i].systems.length;j++){var s=ms.frames[i].systems[j];if(findInNode(tid,s))return s}
+  var ls=ms.looseSystems||[];for(var i=0;i<ls.length;i++){if(findInNode(tid,ls[i]))return ls[i]}
+  return null;
+}
+function findParentName(tid,node){if(!node.children)return null;for(var i=0;i<node.children.length;i++){var c=node.children[i];if(c.id===tid)return null;if(c.isGroup&&c.children)for(var j=0;j<c.children.length;j++)if(c.children[j].id===tid)return c.name}return null}
+
+// Remove task from anywhere in data model
+function removeTaskFromTree(taskId,ms){
+  ms=ms||activeMilestone();
+  for(var i=0;i<ms.frames.length;i++)for(var j=0;j<ms.frames[i].systems.length;j++){if(removeFromNode(taskId,ms.frames[i].systems[j]))return true}
+  var ls=ms.looseSystems||[];for(var i=0;i<ls.length;i++){if(removeFromNode(taskId,ls[i]))return true}
+  var lt=ms.looseTasks||[];for(var i=0;i<lt.length;i++){if(lt[i].id===taskId){lt.splice(i,1);return true}}
+  return false;
+}
+function removeFromNode(taskId,node){
+  if(!node.children)return false;
+  for(var i=0;i<node.children.length;i++){
+    if(node.children[i].id===taskId){node.children.splice(i,1);return true;}
+    if(removeFromNode(taskId,node.children[i]))return true;
+  }
+  return false;
+}
+
+// Remove system from any frame or looseSystems
+function removeSystemFromAny(sysId,ms){
+  ms=ms||activeMilestone();
+  for(var i=0;i<ms.frames.length;i++){var f=ms.frames[i];for(var j=0;j<f.systems.length;j++){if(f.systems[j].id===sysId){f.systems.splice(j,1);return true}}}
+  // Also check as sub-group inside systems
+  for(var i=0;i<ms.frames.length;i++){for(var j=0;j<ms.frames[i].systems.length;j++){if(removeFromNode(sysId,ms.frames[i].systems[j]))return true}}
+  var ls=ms.looseSystems||[];for(var i=0;i<ls.length;i++){if(ls[i].id===sysId){ls.splice(i,1);return true}if(removeFromNode(sysId,ls[i]))return true}
+  return false;
+}
+
+/* ═══════════════════════════════════════
+   SIDEBAR
+   ═══════════════════════════════════════ */
+function renderSidebar(){
+  var el=document.getElementById('sidebar');
+  var mk=monthKey(boardMonth.year,boardMonth.month);
+  var ms=activeMilestone();var allLeaves=getAllLeaves(ms);
+  var sa=allLeaves.filter(function(l){return l.sprint===mk}).length;
+  var sd=allLeaves.filter(function(l){return l.completedAt===mk}).length;
+  var si=allLeaves.filter(function(l){return l.sprint===mk&&l.status==='progress'}).length;
+  var st=0;allLeaves.filter(function(l){return l.sprint===mk}).forEach(function(l){st+=parseTime(l.time)});
+  var html='<div class="sb-section"><div class="sb-section-title">Sprint</div>';
+  html+='<div class="sprint-nav"><button class="sprint-nav-btn" onclick="changeSidebarMonth(-1)">&#9664;</button>';
+  html+='<div class="sprint-label">'+monthLabel(boardMonth.year,boardMonth.month)+'</div>';
+  html+='<button class="sprint-nav-btn" onclick="changeSidebarMonth(1)">&#9654;</button></div>';
+  html+='<div class="sprint-stats-box">';
+  html+='<div class="sprint-stat-row"><span>Assigned</span><span class="sval">'+sa+'</span></div>';
+  html+='<div class="sprint-stat-row"><span>Completed</span><span class="sval">'+sd+'</span></div>';
+  html+='<div class="sprint-stat-row"><span>In Progress</span><span class="sval">'+si+'</span></div>';
+  html+='<div class="sprint-stat-row"><span>Time est.</span><span class="sval">'+formatTime(st)+'</span></div></div>';
+  html+='<button class="sprint-board-btn'+(isSprintOverview?' active':'')+'" onclick="openSprintOverview()">'+(isSprintOverview?'✓ Sprint Board Open':'Open Sprint Board')+'</button></div>';
+  html+='<div class="sb-section"><div class="ms-header" onclick="toggleMilestones()">';
+  html+='<span class="ms-toggle'+(msCollapsed?' collapsed':'')+'">▼</span>';
+  html+='<div class="sb-section-title" style="margin:0">Milestones</div></div>';
+  html+='<div class="ms-list'+(msCollapsed?' collapsed':'')+'">';
+  milestones.forEach(function(m,idx){
+    var leaves=getAllLeaves(m);var done=leaves.filter(function(l){return l.status==='done'}).length;
+    var pct=leaves.length>0?Math.round(done/leaves.length*100):0;
+    html+='<div class="ms-item'+(idx===activeMilestoneIdx?' active':'')+'" onclick="switchMilestone('+idx+')">';
+    html+='<div class="ms-item-info"><div class="ms-item-name">MS'+(idx+1)+': '+m.name.replace(/Milestone \d+: /,'')+'</div>';
+    html+='<div class="ms-item-bar"><div class="ms-item-fill" style="width:'+pct+'%;background:'+getProgressColor(pct)+'"></div></div></div>';
+    html+='<div class="ms-item-pct">'+pct+'%</div></div>';
+  });
+  html+='</div></div>';
+  el.innerHTML=html;
+}
+function toggleMilestones(){msCollapsed=!msCollapsed;renderSidebar()}
+function switchMilestone(idx){activeMilestoneIdx=idx;closeBoard();renderAll()}
+function changeSidebarMonth(dir){
+  boardMonth.month+=dir;
+  if(boardMonth.month>11){boardMonth.month=0;boardMonth.year++}
+  if(boardMonth.month<0){boardMonth.month=11;boardMonth.year--}
+  renderSidebar();if(isSprintOverview)renderBoard();
+}
+
+/* ═══════════════════════════════════════
+   FLOATING UI
+   ═══════════════════════════════════════ */
+function renderFloatingUI(){
+  var ms=activeMilestone();var allLeaves=getAllLeaves(ms);
+  var td=allLeaves.filter(function(l){return l.status==='done'}).length;
+  var tp=allLeaves.length>0?Math.round(td/allLeaves.length*100):0;
+  var ta=0,tda=0;allLeaves.forEach(function(l){ta+=parseTime(l.time);if(l.status==='done')tda+=parseTime(l.time)});
+  document.getElementById('stats-pill').innerHTML='<span class="sp-val">'+td+'/'+allLeaves.length+'</span> tasks <span class="sp-sep">|</span> <span class="sp-val">'+tp+'%</span> <span class="sp-sep">|</span> <span class="sp-val">'+formatTime(tda)+'</span> / '+formatTime(ta);
+  var bc=document.getElementById('float-breadcrumb');
+  if(isSprintOverview||currentBoardId){bc.style.display='none'}
+  else{bc.style.display='flex';bc.innerHTML='<span class="current">'+ms.name+'</span>'}
+}
+
+/* ═══════════════════════════════════════
+   AUTO LAYOUT
+   ═══════════════════════════════════════ */
+function estimateSysHeight(sys){
+  var h=80;
+  (sys.children||[]).forEach(function(c){
+    if(c.isGroup){h+=38+(c.children?c.children.length*26:0)}else{h+=26}
+  });
+  return h;
+}
+function estimateFrameHeight(frame){
+  if(frame.standalone)return 90;
+  var maxH=0;
+  frame.systems.forEach(function(sys){var h=estimateSysHeight(sys);if(h>maxH)maxH=h});
+  return maxH+65;
+}
+function autoLayoutMilestone(ms){
+  if(ms._laid_out)return;
+  ms._laid_out=true;
+  if(!ms.looseSystems)ms.looseSystems=[];
+  if(!ms.looseTasks)ms.looseTasks=[];
+  var curY=30;
+  ms.frames.forEach(function(frame){
+    if(frame.x!==undefined)return;
+    if(frame.standalone){
+      frame.x=280;frame.y=curY;frame.w=300;
+      curY+=130;
+    }else{
+      frame.x=40;frame.y=curY;
+      frame.w=Math.min(1200,Math.max(500,frame.systems.length*260+60));
+      curY+=estimateFrameHeight(frame)+35;
+    }
+  });
+}
+
+/* ═══════════════════════════════════════
+   MAP RENDERING
+   ═══════════════════════════════════════ */
+function renderMap(){
+  var ms=activeMilestone();autoLayoutMilestone(ms);
+  var el=document.getElementById('map-inner');var html='';
+
+  ms.frames.forEach(function(frame){
+    if(frame.standalone){
+      var sys=frame.systems[0],prog=getProgress(sys);
+      html+='<div class="canvas-node standalone-node" data-frame-id="'+frame.id+'" data-sys-id="'+sys.id+'" ';
+      html+='style="left:'+frame.x+'px;top:'+frame.y+'px;width:'+(frame.w||300)+'px;">';
+      html+='<div class="root-name">'+sys.name+'</div>';
+      html+='<div class="root-progress-bar"><div class="root-progress-fill" style="width:'+prog.pct+'%;background:'+getProgressColor(prog.pct)+'"></div></div>';
+      html+='<div class="root-pct">'+prog.done+'/'+prog.total+' · '+prog.pct+'%</div>';
+      html+='</div>';
+    }else{
+      html+='<div class="canvas-node canvas-frame" data-frame-id="'+frame.id+'" ';
+      html+='style="left:'+frame.x+'px;top:'+frame.y+'px;width:'+(frame.w||600)+'px;">';
+      html+='<div class="frame-drag-bar"><span class="frame-label">'+(frame.label||'')+'</span></div>';
+      html+='<div class="frame-body">';
+      frame.systems.forEach(function(sys){html+=renderSystemBox(sys)});
+      html+='</div>';
+      if(frame.note)html+='<div class="frame-note">'+frame.note+'</div>';
+      html+='<div class="resize-handle resize-r" data-resize="r"></div>';
+      html+='<div class="resize-handle resize-b" data-resize="b"></div>';
+      html+='<div class="resize-handle resize-rb" data-resize="rb"></div>';
+      html+='</div>';
+    }
+  });
+
+  // Loose systems
+  (ms.looseSystems||[]).forEach(function(sys){
+    html+='<div class="canvas-node loose-system" data-sys-id="'+sys.id+'" ';
+    html+='style="left:'+sys.x+'px;top:'+sys.y+'px;width:'+(sys.w||280)+'px;">';
+    html+=renderSystemBox(sys);
+    html+='<div class="resize-handle resize-r" data-resize="r"></div>';
+    html+='<div class="resize-handle resize-b" data-resize="b"></div>';
+    html+='</div>';
+  });
+
+  // Loose tasks
+  (ms.looseTasks||[]).forEach(function(task){
+    var isDone=task.status==='done';
+    html+='<div class="canvas-node loose-task" data-task-id="'+task.id+'" ';
+    html+='style="left:'+task.x+'px;top:'+task.y+'px;">';
+    html+='<img class="task-icon" src="'+iconFor(task.type)+'" alt="'+task.type+'">';
+    html+='<span class="task-name'+(isDone?' done':'')+'">'+task.name+'</span>';
+    html+='</div>';
+  });
+
+  el.innerHTML=html;
+}
+
+function renderTaskItem(item){
+  var isDone=item.status==='done';
+  var html='<div class="task-item" data-task-id="'+item.id+'">';
+  html+='<img class="task-icon" src="'+iconFor(item.type)+'" alt="'+item.type+'">';
+  html+='<div class="task-name'+(isDone?' done':'')+'">'+item.name+'</div>';
+  if(item.sprint)html+='<span class="task-sprint">'+sprintShort(item.sprint)+'</span>';
+  html+='</div>';
+  return html;
+}
+
+function renderSystemBox(sys){
+  var prog=getProgress(sys),totalT=getTotalTime(sys),doneT=getDoneTime(sys),pClass=getProgressClass(prog.pct);
+  var html='<div class="system-box" data-sys-id="'+sys.id+'">';
+  html+='<div class="system-box-header">';
+  html+='<div class="system-box-name">'+sys.name+'</div>';
+  html+='<div class="system-box-badge '+pClass+'">'+prog.done+'/'+prog.total+'</div></div>';
+  html+='<div class="system-box-progress"><div class="system-box-progress-fill" style="width:'+prog.pct+'%;background:'+getProgressColor(prog.pct)+'"></div></div>';
+  html+='<div class="system-box-body">';
+  var groups=(sys.children||[]).filter(function(c){return c.isGroup});
+  var loose=(sys.children||[]).filter(function(c){return!c.isGroup});
+  groups.forEach(function(g){
+    var gP=getProgress(g),gC=getProgressClass(gP.pct);
+    html+='<div class="sub-group" data-sys-id="'+g.id+'">';
+    html+='<div class="sub-group-header"><div class="sub-group-name">'+g.name+'</div>';
+    html+='<div class="sub-group-badge '+gC+'">'+gP.done+'/'+gP.total+'</div></div>';
+    html+='<div class="sub-group-items">';
+    (g.children||[]).forEach(function(item){html+=renderTaskItem(item)});
+    html+='</div></div>';
+  });
+  if(loose.length){html+='<div class="loose-items">';loose.forEach(function(item){html+=renderTaskItem(item)});html+='</div>'}
+  html+='</div>';
+  html+='<div class="system-box-time"><span>'+formatTime(doneT)+' / '+formatTime(totalT)+'</span><span>'+prog.pct+'%</span></div>';
+  html+='</div>';
+  return html;
+}
+
+/* ═══════════════════════════════════════
+   CANVAS DRAG SYSTEM
+   ═══════════════════════════════════════ */
+var dragState=null,resizeState=null;
+var isPanning=false,isMidPanning=false,panStart={x:0,y:0},panStartOffset={x:0,y:0};
+var mapVP=document.getElementById('map-viewport');
+
+function screenToCanvas(sx,sy){
+  var r=mapVP.getBoundingClientRect();
+  return{x:(sx-r.left-mapPan.x)/mapZoom,y:(sy-r.top-mapPan.y)/mapZoom};
+}
+
+function createGhost(el,e){
+  var r=el.getBoundingClientRect();
+  var g=el.cloneNode(true);
+  g.id='drag-ghost';
+  g.style.cssText='position:fixed;left:'+r.left+'px;top:'+r.top+'px;width:'+r.width+'px;pointer-events:none;z-index:10000;opacity:.85;box-shadow:0 12px 32px rgba(0,0,0,.5);border-radius:10px;transform:rotate(1deg) scale(1.02);transition:none;';
+  document.body.appendChild(g);
+  return{el:g,ox:e.clientX-r.left,oy:e.clientY-r.top};
+}
+
+function removeGhost(){var g=document.getElementById('drag-ghost');if(g)g.remove()}
+
+// ── mousedown handler ──
+mapVP.addEventListener('mousedown',function(e){
+  if(e.button===1){
+    e.preventDefault();isMidPanning=true;
+    panStart={x:e.clientX,y:e.clientY};panStartOffset={x:mapPan.x,y:mapPan.y};
+    return;
+  }
+  if(e.button!==0)return;
+
+  // Check resize handles first
+  var rh=e.target.closest('.resize-handle');
+  if(rh){
+    var node=rh.closest('.canvas-node');
+    resizeState={el:node,dir:rh.dataset.resize,startX:e.clientX,startY:e.clientY,
+      startW:node.offsetWidth,startH:node.offsetHeight,
+      frameId:node.dataset.frameId||null,sysId:node.dataset.sysId||null};
+    e.preventDefault();e.stopPropagation();return;
+  }
+
+  // Check draggable elements (most specific first)
+  var taskEl=e.target.closest('.task-item');
+  var looseTaskEl=e.target.closest('.loose-task');
+  var subGroupEl=e.target.closest('.sub-group-header');
+  var sysHeaderEl=e.target.closest('.system-box-header');
+  var frameDragEl=e.target.closest('.frame-drag-bar');
+  var standaloneEl=e.target.closest('.standalone-node');
+
+  if(taskEl){
+    var tid=taskEl.dataset.taskId;
+    dragState={type:'task',id:tid,srcEl:taskEl,mouseX:e.clientX,mouseY:e.clientY,ghost:null,dragging:false};
+    e.preventDefault();return;
+  }
+  if(looseTaskEl){
+    var tid=looseTaskEl.dataset.taskId;
+    dragState={type:'task',id:tid,srcEl:looseTaskEl,mouseX:e.clientX,mouseY:e.clientY,ghost:null,dragging:false};
+    e.preventDefault();return;
+  }
+  if(subGroupEl){
+    var sg=subGroupEl.closest('.sub-group');
+    dragState={type:'system',id:sg.dataset.sysId,srcEl:sg,mouseX:e.clientX,mouseY:e.clientY,ghost:null,dragging:false};
+    e.preventDefault();return;
+  }
+  if(sysHeaderEl){
+    var sb=sysHeaderEl.closest('.system-box');
+    dragState={type:'system',id:sb.dataset.sysId,srcEl:sb,mouseX:e.clientX,mouseY:e.clientY,ghost:null,dragging:false};
+    e.preventDefault();return;
+  }
+  if(frameDragEl){
+    var fr=frameDragEl.closest('.canvas-frame');
+    dragState={type:'frame',id:fr.dataset.frameId,srcEl:fr,mouseX:e.clientX,mouseY:e.clientY,ghost:null,dragging:false};
+    e.preventDefault();return;
+  }
+  if(standaloneEl){
+    dragState={type:'standalone',id:standaloneEl.dataset.frameId,sysId:standaloneEl.dataset.sysId,
+      srcEl:standaloneEl,mouseX:e.clientX,mouseY:e.clientY,ghost:null,dragging:false};
+    e.preventDefault();return;
+  }
+
+  // Otherwise: pan
+  if(!e.target.closest('.map-controls')){
+    isPanning=true;panStart={x:e.clientX,y:e.clientY};panStartOffset={x:mapPan.x,y:mapPan.y};
+    e.preventDefault();
+  }
+});
+
+// ── mousemove handler ──
+window.addEventListener('mousemove',function(e){
+  // Pan
+  if(isPanning||isMidPanning){
+    mapPan.x=panStartOffset.x+(e.clientX-panStart.x);
+    mapPan.y=panStartOffset.y+(e.clientY-panStart.y);
+    applyMapTransform();return;
+  }
+
+  // Resize
+  if(resizeState){
+    var dx=(e.clientX-resizeState.startX)/mapZoom;
+    var dy=(e.clientY-resizeState.startY)/mapZoom;
+    if(resizeState.dir.indexOf('r')>-1)resizeState.el.style.width=Math.max(200,resizeState.startW+dx)+'px';
+    if(resizeState.dir.indexOf('b')>-1)resizeState.el.style.height=Math.max(100,resizeState.startH+dy)+'px';
+    return;
+  }
+
+  // Drag
+  if(!dragState)return;
+  var dx=e.clientX-dragState.mouseX,dy=e.clientY-dragState.mouseY;
+
+  if(!dragState.dragging){
+    if(Math.abs(dx)>CLICK_THRESHOLD||Math.abs(dy)>CLICK_THRESHOLD){
+      dragState.dragging=true;
+      dragState.ghost=createGhost(dragState.srcEl,e);
+      dragState.srcEl.classList.add('canvas-dragging');
+    }
+    return;
+  }
+
+  // Move ghost
+  dragState.ghost.el.style.left=(e.clientX-dragState.ghost.ox)+'px';
+  dragState.ghost.el.style.top=(e.clientY-dragState.ghost.oy)+'px';
+
+  // Highlight drop targets
+  highlightDropTarget(e);
+});
+
+// ── mouseup handler ──
+window.addEventListener('mouseup',function(e){
+  if(e.button===1){isMidPanning=false;return}
+  if(e.button===0)isPanning=false;
+
+  // Resize finish
+  if(resizeState){
+    var nw=parseFloat(resizeState.el.style.width);
+    var ms=activeMilestone();
+    if(resizeState.frameId){
+      var fr=ms.frames.find(function(f){return f.id===resizeState.frameId});
+      if(fr)fr.w=nw;
+    }
+    if(resizeState.sysId&&resizeState.el.closest('.loose-system')){
+      var sys=(ms.looseSystems||[]).find(function(s){return s.id===resizeState.sysId});
+      if(sys)sys.w=nw;
+    }
+    resizeState=null;return;
+  }
+
+  // Drag finish
+  if(!dragState)return;
+  var state=dragState;dragState=null;
+  clearDropHighlights();
+
+  if(!state.dragging){
+    // It was a click
+    handleMapClick(state,e);return;
+  }
+
+  // Remove ghost
+  state.srcEl.classList.remove('canvas-dragging');
+  removeGhost();
+
+  // Calculate canvas position of drop
+  var cp=screenToCanvas(e.clientX,e.clientY);
+  var ms=activeMilestone();
+
+  // Find drop target element under cursor
+  var target=findDropTargetAt(e.clientX,e.clientY,state.type,state.id);
+
+  if(state.type==='frame'){
+    // Just move frame position
+    var frame=ms.frames.find(function(f){return f.id===state.id});
+    if(frame){
+      var dx=(e.clientX-state.mouseX)/mapZoom;
+      var dy=(e.clientY-state.mouseY)/mapZoom;
+      frame.x=(frame.x||0)+dx;frame.y=(frame.y||0)+dy;
+    }
+    renderMap();
+  }
+  else if(state.type==='standalone'){
+    var frame=ms.frames.find(function(f){return f.id===state.id});
+    if(frame){
+      var dx=(e.clientX-state.mouseX)/mapZoom;
+      var dy=(e.clientY-state.mouseY)/mapZoom;
+      frame.x=(frame.x||0)+dx;frame.y=(frame.y||0)+dy;
+    }
+    renderMap();
+  }
+  else if(state.type==='system'){
+    var sysNode=findTask(state.id);
+    if(!sysNode)return;
+    var sysCopy=JSON.parse(JSON.stringify(sysNode));
+
+    if(target&&target.type==='frame'){
+      // Drop system into frame
+      removeSystemFromAny(state.id);
+      var targetFrame=ms.frames.find(function(f){return f.id===target.id});
+      if(targetFrame)targetFrame.systems.push(sysCopy);
+    }else{
+      // Make loose system
+      removeSystemFromAny(state.id);
+      sysCopy.x=cp.x;sysCopy.y=cp.y;sysCopy.w=280;
+      if(!ms.looseSystems)ms.looseSystems=[];
+      ms.looseSystems.push(sysCopy);
+    }
+    renderMap();renderFloatingUI();renderSidebar();
+  }
+  else if(state.type==='task'){
+    var taskNode=findTask(state.id);
+    if(!taskNode||taskNode.children)return;
+    var taskCopy=JSON.parse(JSON.stringify(taskNode));
+
+    if(target&&(target.type==='system'||target.type==='subgroup')){
+      // Drop task into system/subgroup
+      removeTaskFromTree(state.id);
+      var targetNode=findTask(target.id);
+      if(targetNode){if(!targetNode.children)targetNode.children=[];targetNode.children.push(taskCopy)}
+    }else{
+      // Make loose task
+      removeTaskFromTree(state.id);
+      taskCopy.x=cp.x;taskCopy.y=cp.y;
+      if(!ms.looseTasks)ms.looseTasks=[];
+      ms.looseTasks.push(taskCopy);
+    }
+    renderMap();renderFloatingUI();renderSidebar();
+  }
+});
+
+// ── Click handler (when drag didn't happen) ──
+function handleMapClick(state,e){
+  if(state.type==='standalone'){
+    openBoard(state.sysId,findTask(state.sysId).name);
+  }else if(state.type==='system'){
+    var sys=findTask(state.id);
+    if(sys)openBoard(state.id,sys.name);
+  }else if(state.type==='task'){
+    // Could open edit dialog later
+  }
+}
+
+// ── Drop target detection ──
+function findDropTargetAt(sx,sy,dragType,dragId){
+  var ghost=document.getElementById('drag-ghost');
+  if(ghost)ghost.style.display='none';
+  var el=document.elementFromPoint(sx,sy);
+  if(ghost)ghost.style.display='';
+  if(!el)return null;
+
+  if(dragType==='task'){
+    var sg=el.closest('.sub-group');
+    if(sg&&sg.dataset.sysId!==dragId)return{type:'subgroup',id:sg.dataset.sysId,el:sg};
+    var sb=el.closest('.system-box');
+    if(sb&&sb.dataset.sysId!==dragId)return{type:'system',id:sb.dataset.sysId,el:sb};
+  }
+  if(dragType==='system'){
+    var fr=el.closest('.canvas-frame');
+    if(fr)return{type:'frame',id:fr.dataset.frameId,el:fr};
+  }
+  return null;
+}
+
+// ── Drop highlight ──
+function highlightDropTarget(e){
+  clearDropHighlights();
+  if(!dragState)return;
+  var target=findDropTargetAt(e.clientX,e.clientY,dragState.type,dragState.id);
+  if(target)target.el.classList.add('drop-highlight');
+}
+function clearDropHighlights(){
+  document.querySelectorAll('.drop-highlight').forEach(function(el){el.classList.remove('drop-highlight')});
+}
+
+// Prevent middle-click autoscroll
+mapVP.addEventListener('auxclick',function(e){if(e.button===1)e.preventDefault()});
+
+/* ═══════════════════════════════════════
+   CONTEXT MENU (Right-click)
+   ═══════════════════════════════════════ */
+mapVP.addEventListener('contextmenu',function(e){
+  if(e.target.closest('.task-item,.kanban-card,.loose-task,.map-controls'))return;
+  e.preventDefault();
+  showContextMenu(e.clientX,e.clientY);
+});
+
+function showContextMenu(sx,sy){
+  closeContextMenu();
+  var cp=screenToCanvas(sx,sy);
+  var menu=document.createElement('div');
+  menu.id='ctx-menu';menu.className='context-menu';
+  menu.style.left=sx+'px';menu.style.top=sy+'px';
+  menu.innerHTML='<div class="ctx-item" data-action="task">✚ New Task</div><div class="ctx-sep"></div><div class="ctx-item" data-action="system">☐ New System</div><div class="ctx-item" data-action="frame">▢ New Frame</div>';
+  menu.addEventListener('click',function(ev){
+    var action=ev.target.dataset.action;
+    if(action==='task')createNewTask(cp.x,cp.y);
+    else if(action==='system')createNewSystem(cp.x,cp.y);
+    else if(action==='frame')createNewFrame(cp.x,cp.y);
+    closeContextMenu();
+  });
+  document.body.appendChild(menu);
+  setTimeout(function(){document.addEventListener('mousedown',closeContextMenuOnClick)},0);
+}
+function closeContextMenu(){var m=document.getElementById('ctx-menu');if(m)m.remove();document.removeEventListener('mousedown',closeContextMenuOnClick)}
+function closeContextMenuOnClick(e){if(!e.target.closest('.context-menu'))closeContextMenu()}
+
+function createNewTask(x,y){
+  var ms=activeMilestone();if(!ms.looseTasks)ms.looseTasks=[];
+  var id='task-'+Date.now();
+  ms.looseTasks.push({id:id,name:'New Task',type:'script',status:'planned',time:null,sprint:null,completedAt:null,x:x,y:y});
+  renderMap();renderFloatingUI();renderSidebar();
+}
+function createNewSystem(x,y){
+  var ms=activeMilestone();if(!ms.looseSystems)ms.looseSystems=[];
+  var id='sys-'+Date.now();
+  ms.looseSystems.push({id:id,name:'New System',children:[],x:x,y:y,w:250});
+  renderMap();
+}
+function createNewFrame(x,y){
+  var ms=activeMilestone();
+  var id='frame-'+Date.now();
+  ms.frames.push({id:id,label:'New Frame',systems:[],x:x,y:y,w:500});
+  renderMap();
+}
+
+/* ═══════════════════════════════════════
+   PAN & ZOOM
+   ═══════════════════════════════════════ */
+mapVP.addEventListener('wheel',function(e){
+  e.preventDefault();
+  var rect=mapVP.getBoundingClientRect();
+  var mx=e.clientX-rect.left,my=e.clientY-rect.top;
+  var delta=e.deltaY>0?-0.08:0.08;
+  var oldZ=mapZoom;
+  mapZoom=Math.max(0.2,Math.min(3,mapZoom+delta));
+  var r=mapZoom/oldZ;
+  mapPan.x=mx-(mx-mapPan.x)*r;
+  mapPan.y=my-(my-mapPan.y)*r;
+  applyMapTransform();
+},{passive:false});
+
+function applyMapTransform(){
+  document.getElementById('map-inner').style.transform='translate('+mapPan.x+'px,'+mapPan.y+'px) scale('+mapZoom+')';
+  document.getElementById('zoom-label').textContent=Math.round(mapZoom*100)+'%';
+}
+function zoomAtCenter(delta){
+  var rect=mapVP.getBoundingClientRect();var cx=rect.width/2,cy=rect.height/2;
+  var oldZ=mapZoom;mapZoom=Math.max(0.2,Math.min(3,mapZoom+delta));
+  var r=mapZoom/oldZ;mapPan.x=cx-(cx-mapPan.x)*r;mapPan.y=cy-(cy-mapPan.y)*r;
+  applyMapTransform();
+}
+function resetMapView(){mapPan={x:0,y:0};mapZoom=1;applyMapTransform()}
+
+/* ═══════════════════════════════════════
+   BOARD VIEW
+   ═══════════════════════════════════════ */
+function openBoard(nodeId,displayName){
+  isSprintOverview=false;currentBoardId=nodeId;
+  currentBoardPath=displayName||findTask(nodeId).name;
+  showBoardView();renderBoard();
+}
+function openSprintOverview(){
+  if(isSprintOverview){closeBoard();return}
+  isSprintOverview=true;currentBoardId=null;
+  showBoardView();renderBoard();
+}
+function showBoardView(){
+  document.getElementById('map-viewport').classList.add('hidden');
+  document.getElementById('board-view').classList.add('active');
+  renderSidebar();renderFloatingUI();
+}
+function closeBoard(){
+  document.getElementById('map-viewport').classList.remove('hidden');
+  document.getElementById('board-view').classList.remove('active');
+  currentBoardId=null;isSprintOverview=false;renderAll();
+}
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&(currentBoardId||isSprintOverview))closeBoard()});
+
+function renderBoard(){
+  var panel=document.getElementById('board-view');
+  var ms=activeMilestone();var mk=monthKey(boardMonth.year,boardMonth.month);
+  if(isSprintOverview)renderSprintBoard(panel,ms,mk);
+  else renderSystemBoard(panel,ms,mk);
+  renderFloatingUI();
+}
+
+function renderSprintBoard(panel,ms,mk){
+  var allLeaves=getAllLeaves(ms);
+  var filtered=allLeaves.filter(function(l){return l.sprint===mk});
+  var sd=filtered.filter(function(l){return l.status==='done'}).length;
+  var st=0;filtered.forEach(function(l){st+=parseTime(l.time)});
+  var html='<div class="board-header"><button class="board-back" onclick="closeBoard()">&#9664; Map</button>';
+  html+='<div><div class="board-title">Sprint: '+monthLabel(boardMonth.year,boardMonth.month)+'</div>';
+  html+='<div class="board-subtitle">'+ms.name+'</div></div></div>';
+  html+='<div class="board-stats"><span class="val">'+filtered.length+'</span> assigned · <span class="val">'+sd+'</span> completed · <span class="val">'+formatTime(st)+'</span> est.</div>';
+  html+='<div class="board-month-nav"><button class="bm-btn" onclick="changeSidebarMonth(-1)">&#9664;</button>';
+  html+='<div class="bm-label">'+monthLabel(boardMonth.year,boardMonth.month)+'</div>';
+  html+='<button class="bm-btn" onclick="changeSidebarMonth(1)">&#9654;</button></div>';
+  html+=renderKanban(filtered,mk,true);
+  panel.innerHTML=html;setupKanbanDragDrop();
+}
+
+function renderSystemBoard(panel,ms,mk){
+  var node=findTask(currentBoardId);if(!node)return;
+  var allLeaves=getLeaves(node);
+  var prog=getProgress(node);var totalT=getTotalTime(node),doneT=getDoneTime(node);
+  var html='<div class="board-header"><button class="board-back" onclick="closeBoard()">&#9664; Map</button>';
+  html+='<div class="board-title">'+currentBoardPath+'</div></div>';
+  html+='<div class="board-stats"><span class="val">'+prog.done+'/'+prog.total+'</span> tasks · <span class="val">'+prog.pct+'%</span> · <span class="val">'+formatTime(doneT)+'</span>/'+formatTime(totalT)+'</div>';
+  html+=renderKanban(allLeaves,mk,false);
+  panel.innerHTML=html;setupKanbanDragDrop();
+}
+
+function renderKanban(filtered,mk,showSystem){
+  var html='<div class="kanban">';
+  STATUSES.forEach(function(s){
+    var items=filtered.filter(function(l){return(l.status||'planned')===s});
+    var orderKey=getBoardKey()+'_'+s;
+    if(taskOrder[orderKey]){var o=[];taskOrder[orderKey].forEach(function(id){var f=items.find(function(i){return i.id===id});if(f)o.push(f)});items.forEach(function(i){if(o.indexOf(i)===-1)o.push(i)});items=o;}
+    var cc=s==='progress'?'kh-progress':('kh-'+s);
+    html+='<div class="kanban-col"><div class="kanban-col-header '+cc+'">'+STATUS_LABELS[s]+' '+items.length+'</div>';
+    html+='<div class="kanban-cards" data-status="'+s+'">';
+    if(!items.length)html+='<div class="kanban-empty">No tasks</div>';
+    items.forEach(function(item){
+      var sn='';if(showSystem){var sys=findSystemForTask(item.id);if(sys)sn=sys.name}
+      var pn='';if(!showSystem&&currentBoardId){var node=findTask(currentBoardId);if(node)pn=findParentName(item.id,node)||''}
+      html+='<div class="kanban-card" draggable="true" data-task-id="'+item.id+'">';
+      html+='<div class="kanban-card-top"><img class="kanban-card-icon" src="'+iconFor(item.type)+'" alt="'+item.type+'">';
+      html+='<div class="kanban-card-name">'+item.name+'</div></div>';
+      html+='<div class="kanban-card-meta">';
+      if(showSystem&&sn)html+='<span class="kanban-card-system">'+sn+'</span>';
+      if(pn)html+='<span class="kanban-card-parent">'+pn+'</span>';
+      if(item.time)html+='<span>'+item.time+'</span>';
+      if(item.sprint)html+='<span>'+sprintShort(item.sprint)+'</span>';
+      html+='</div><div class="kanban-card-actions">';
+      var isTS=item.sprint===mk;
+      if(!isTS)html+='<button class="assign-btn" onclick="event.stopPropagation();assignSprint(\''+item.id+'\')">+ '+MONTH_NAMES[boardMonth.month]+'</button>';
+      else html+='<button class="assign-btn assigned" onclick="event.stopPropagation();unassignSprint(\''+item.id+'\')">✓ '+MONTH_NAMES[boardMonth.month]+'</button>';
+      html+='</div></div>';
+    });
+    html+='</div></div>';
+  });
+  html+='</div>';return html;
+}
+
+function getBoardKey(){
+  if(isSprintOverview)return'sprint_'+activeMilestoneIdx+'_'+monthKey(boardMonth.year,boardMonth.month);
+  return'sys_'+currentBoardId;
+}
+
+/* ═══════════════════════════════════════
+   KANBAN DRAG-DROP
+   ═══════════════════════════════════════ */
+function setupKanbanDragDrop(){
+  var cards=document.querySelectorAll('.kanban-card[draggable]');
+  var cols=document.querySelectorAll('.kanban-cards');
+  cards.forEach(function(card){
+    card.addEventListener('dragstart',function(e){
+      e.dataTransfer.setData('text/plain',card.getAttribute('data-task-id'));
+      e.dataTransfer.effectAllowed='move';card.classList.add('dragging');
+    });
+    card.addEventListener('dragend',function(){card.classList.remove('dragging');clearKanbanDrag()});
+  });
+  cols.forEach(function(col){
+    col.addEventListener('dragover',function(e){
+      e.preventDefault();e.dataTransfer.dropEffect='move';col.classList.add('drag-over');
+      document.querySelectorAll('.drop-indicator').forEach(function(d){d.remove()});
+      var after=getDragAfterElement(col,e.clientY);
+      var ind=document.createElement('div');ind.className='drop-indicator';
+      if(after)col.insertBefore(ind,after);else col.appendChild(ind);
+    });
+    col.addEventListener('dragleave',function(e){if(!col.contains(e.relatedTarget)){col.classList.remove('drag-over');col.querySelectorAll('.drop-indicator').forEach(function(d){d.remove()})}});
+    col.addEventListener('drop',function(e){
+      e.preventDefault();col.classList.remove('drag-over');col.querySelectorAll('.drop-indicator').forEach(function(d){d.remove()});
+      var taskId=e.dataTransfer.getData('text/plain');var newStatus=col.getAttribute('data-status');
+      if(!taskId||!newStatus)return;
+      var t=findTask(taskId);if(!t||t.children)return;
+      t.status=newStatus;
+      if(newStatus==='done')t.completedAt=monthKey(boardMonth.year,boardMonth.month);else t.completedAt=null;
+      var after=getDragAfterElement(col,e.clientY);
+      var orderKey=getBoardKey()+'_'+newStatus;
+      var existing=col.querySelectorAll('.kanban-card:not(.dragging)');
+      var newOrder=[];var ins=false;
+      existing.forEach(function(c){var cid=c.getAttribute('data-task-id');if(after&&c===after&&!ins){newOrder.push(taskId);ins=true}if(cid!==taskId)newOrder.push(cid)});
+      if(!ins)newOrder.push(taskId);taskOrder[orderKey]=newOrder;
+      STATUSES.forEach(function(s){if(s===newStatus)return;var ok=getBoardKey()+'_'+s;if(taskOrder[ok])taskOrder[ok]=taskOrder[ok].filter(function(id){return id!==taskId})});
+      renderBoard();renderMap();renderSidebar();
+    });
+  });
+}
+function clearKanbanDrag(){document.querySelectorAll('.drag-over').forEach(function(c){c.classList.remove('drag-over')});document.querySelectorAll('.drop-indicator').forEach(function(d){d.remove()})}
+function getDragAfterElement(col,y){
+  var cards=Array.from(col.querySelectorAll('.kanban-card:not(.dragging)'));
+  var closest=null,closestOff=Number.NEGATIVE_INFINITY;
+  cards.forEach(function(card){var box=card.getBoundingClientRect();var off=y-box.top-box.height/2;if(off<0&&off>closestOff){closestOff=off;closest=card}});
+  return closest;
+}
+
+function assignSprint(tid){var t=findTask(tid);if(!t)return;t.sprint=monthKey(boardMonth.year,boardMonth.month);renderBoard();renderSidebar()}
+function unassignSprint(tid){var t=findTask(tid);if(!t)return;t.sprint=null;renderBoard();renderSidebar()}
+
+/* ═══════════════════════════════════════
+   RENDER ALL & INIT
+   ═══════════════════════════════════════ */
+function renderAll(){renderSidebar();renderMap();renderFloatingUI();applyMapTransform()}
+renderAll();
+</script>
+</body>
+</html>

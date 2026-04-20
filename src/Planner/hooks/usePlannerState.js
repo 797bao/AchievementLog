@@ -1,0 +1,304 @@
+import { useState, useCallback, useMemo } from 'react';
+import { createSampleMilestones, MONTH_NAMES } from '../plannerData';
+import {
+  getAllLeaves,
+  findTask,
+  removeTaskFromTree,
+  removeSystemFromAny,
+  autoLayoutMilestone,
+  monthKey,
+  parseTime,
+  formatTime,
+} from '../plannerHelpers';
+
+export default function usePlannerState() {
+  const [milestones, setMilestones] = useState(() => createSampleMilestones());
+  const [activeMilestoneIdx, setActiveMilestoneIdx] = useState(0);
+  const [boardMonth, setBoardMonth] = useState({ year: 2026, month: 3 });
+  const [currentBoardId, setCurrentBoardId] = useState(null);
+  const [currentBoardPath, setCurrentBoardPath] = useState(null);
+  const [isSprintOverview, setIsSprintOverview] = useState(false);
+  const [msCollapsed, setMsCollapsed] = useState(false);
+  const [taskOrder, setTaskOrder] = useState({});
+
+  /* ─── Derived ─── */
+  const activeMilestone = milestones[activeMilestoneIdx];
+
+  const allLeaves = useMemo(
+    () => getAllLeaves(activeMilestone),
+    [activeMilestone]
+  );
+
+  const mk = monthKey(boardMonth.year, boardMonth.month);
+
+  const sprintStats = useMemo(() => {
+    const assigned = allLeaves.filter((l) => l.sprint === mk).length;
+    const completed = allLeaves.filter((l) => l.completedAt === mk).length;
+    const inProgress = allLeaves.filter((l) => l.sprint === mk && l.status === 'progress').length;
+    let timeEst = 0;
+    allLeaves.filter((l) => l.sprint === mk).forEach((l) => { timeEst += parseTime(l.time); });
+    return { assigned, completed, inProgress, timeEst: formatTime(timeEst) };
+  }, [allLeaves, mk]);
+
+  const totalStats = useMemo(() => {
+    const done = allLeaves.filter((l) => l.status === 'done').length;
+    const total = allLeaves.length;
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    let totalTime = 0;
+    let doneTime = 0;
+    allLeaves.forEach((l) => {
+      totalTime += parseTime(l.time);
+      if (l.status === 'done') doneTime += parseTime(l.time);
+    });
+    return { done, total, pct, totalTime: formatTime(totalTime), doneTime: formatTime(doneTime) };
+  }, [allLeaves]);
+
+  const showBreadcrumb = !isSprintOverview && !currentBoardId;
+  const showBoard = isSprintOverview || !!currentBoardId;
+
+  /* ─── Helpers to clone & update milestones ─── */
+  const updateMilestones = useCallback((updater) => {
+    setMilestones((prev) => {
+      const clone = JSON.parse(JSON.stringify(prev));
+      updater(clone);
+      return clone;
+    });
+  }, []);
+
+  /* ─── Actions ─── */
+  const switchMilestone = useCallback((idx) => {
+    setActiveMilestoneIdx(idx);
+    setCurrentBoardId(null);
+    setCurrentBoardPath(null);
+    setIsSprintOverview(false);
+  }, []);
+
+  const changeSidebarMonth = useCallback((dir) => {
+    setBoardMonth((prev) => {
+      let m = prev.month + dir;
+      let y = prev.year;
+      if (m > 11) { m = 0; y++; }
+      if (m < 0) { m = 11; y--; }
+      return { year: y, month: m };
+    });
+  }, []);
+
+  const toggleMilestones = useCallback(() => {
+    setMsCollapsed((p) => !p);
+  }, []);
+
+  const openBoard = useCallback((nodeId, displayName) => {
+    setIsSprintOverview(false);
+    setCurrentBoardId(nodeId);
+    setCurrentBoardPath(displayName);
+  }, []);
+
+  const openSprintOverview = useCallback(() => {
+    setIsSprintOverview((prev) => {
+      if (prev) {
+        // Close board
+        setCurrentBoardId(null);
+        setCurrentBoardPath(null);
+        return false;
+      }
+      setCurrentBoardId(null);
+      return true;
+    });
+  }, []);
+
+  const closeBoard = useCallback(() => {
+    setCurrentBoardId(null);
+    setCurrentBoardPath(null);
+    setIsSprintOverview(false);
+  }, []);
+
+  /* ─── Canvas mutations ─── */
+  const moveFrame = useCallback((frameId, dx, dy) => {
+    updateMilestones((ms) => {
+      const frame = ms[activeMilestoneIdx].frames.find((f) => f.id === frameId);
+      if (frame) {
+        frame.x = (frame.x || 0) + dx;
+        frame.y = (frame.y || 0) + dy;
+      }
+    });
+  }, [activeMilestoneIdx, updateMilestones]);
+
+  const dropSystem = useCallback((sysId, target, canvasPos) => {
+    updateMilestones((ms) => {
+      const milestone = ms[activeMilestoneIdx];
+      const sysNode = findTask(sysId, milestone);
+      if (!sysNode) return;
+      const sysCopy = JSON.parse(JSON.stringify(sysNode));
+      removeSystemFromAny(sysId, milestone);
+
+      if (target && target.type === 'frame') {
+        const targetFrame = milestone.frames.find((f) => f.id === target.id);
+        if (targetFrame) targetFrame.systems.push(sysCopy);
+      } else {
+        sysCopy.x = canvasPos.x;
+        sysCopy.y = canvasPos.y;
+        sysCopy.w = 280;
+        if (!milestone.looseSystems) milestone.looseSystems = [];
+        milestone.looseSystems.push(sysCopy);
+      }
+    });
+  }, [activeMilestoneIdx, updateMilestones]);
+
+  const dropTask = useCallback((taskId, target, canvasPos) => {
+    updateMilestones((ms) => {
+      const milestone = ms[activeMilestoneIdx];
+      const taskNode = findTask(taskId, milestone);
+      if (!taskNode || taskNode.children) return;
+      const taskCopy = JSON.parse(JSON.stringify(taskNode));
+      removeTaskFromTree(taskId, milestone);
+
+      if (target && (target.type === 'system' || target.type === 'subgroup')) {
+        const targetNode = findTask(target.id, milestone);
+        if (targetNode) {
+          if (!targetNode.children) targetNode.children = [];
+          targetNode.children.push(taskCopy);
+        }
+      } else {
+        taskCopy.x = canvasPos.x;
+        taskCopy.y = canvasPos.y;
+        if (!milestone.looseTasks) milestone.looseTasks = [];
+        milestone.looseTasks.push(taskCopy);
+      }
+    });
+  }, [activeMilestoneIdx, updateMilestones]);
+
+  const resizeFrame = useCallback((frameId, newWidth) => {
+    updateMilestones((ms) => {
+      const frame = ms[activeMilestoneIdx].frames.find((f) => f.id === frameId);
+      if (frame) frame.w = newWidth;
+    });
+  }, [activeMilestoneIdx, updateMilestones]);
+
+  const resizeLooseSystem = useCallback((sysId, newWidth) => {
+    updateMilestones((ms) => {
+      const sys = (ms[activeMilestoneIdx].looseSystems || []).find((s) => s.id === sysId);
+      if (sys) sys.w = newWidth;
+    });
+  }, [activeMilestoneIdx, updateMilestones]);
+
+  const createNewTask = useCallback((x, y) => {
+    updateMilestones((ms) => {
+      const milestone = ms[activeMilestoneIdx];
+      if (!milestone.looseTasks) milestone.looseTasks = [];
+      milestone.looseTasks.push({
+        id: 'task-' + Date.now(),
+        name: 'New Task',
+        type: 'script',
+        status: 'planned',
+        time: null,
+        sprint: null,
+        completedAt: null,
+        x,
+        y,
+      });
+    });
+  }, [activeMilestoneIdx, updateMilestones]);
+
+  const createNewSystem = useCallback((x, y) => {
+    updateMilestones((ms) => {
+      const milestone = ms[activeMilestoneIdx];
+      if (!milestone.looseSystems) milestone.looseSystems = [];
+      milestone.looseSystems.push({
+        id: 'sys-' + Date.now(),
+        name: 'New System',
+        children: [],
+        x,
+        y,
+        w: 250,
+      });
+    });
+  }, [activeMilestoneIdx, updateMilestones]);
+
+  const createNewFrame = useCallback((x, y) => {
+    updateMilestones((ms) => {
+      ms[activeMilestoneIdx].frames.push({
+        id: 'frame-' + Date.now(),
+        label: 'New Frame',
+        systems: [],
+        x,
+        y,
+        w: 500,
+      });
+    });
+  }, [activeMilestoneIdx, updateMilestones]);
+
+  /* ─── Kanban actions ─── */
+  const updateTaskStatus = useCallback((taskId, newStatus) => {
+    updateMilestones((ms) => {
+      const task = findTask(taskId, ms[activeMilestoneIdx]);
+      if (!task || task.children) return;
+      task.status = newStatus;
+      if (newStatus === 'done') {
+        task.completedAt = monthKey(boardMonth.year, boardMonth.month);
+      } else {
+        task.completedAt = null;
+      }
+    });
+  }, [activeMilestoneIdx, boardMonth, updateMilestones]);
+
+  const assignSprint = useCallback((taskId) => {
+    updateMilestones((ms) => {
+      const task = findTask(taskId, ms[activeMilestoneIdx]);
+      if (task) task.sprint = monthKey(boardMonth.year, boardMonth.month);
+    });
+  }, [activeMilestoneIdx, boardMonth, updateMilestones]);
+
+  const unassignSprint = useCallback((taskId) => {
+    updateMilestones((ms) => {
+      const task = findTask(taskId, ms[activeMilestoneIdx]);
+      if (task) task.sprint = null;
+    });
+  }, [activeMilestoneIdx, updateMilestones]);
+
+  /* ─── Task order for kanban ─── */
+  const updateTaskOrder = useCallback((orderKey, newOrder) => {
+    setTaskOrder((prev) => ({ ...prev, [orderKey]: newOrder }));
+  }, []);
+
+  /* ─── Ensure layout ─── */
+  autoLayoutMilestone(activeMilestone);
+
+  return {
+    // State
+    milestones,
+    activeMilestoneIdx,
+    activeMilestone,
+    boardMonth,
+    currentBoardId,
+    currentBoardPath,
+    isSprintOverview,
+    msCollapsed,
+    taskOrder,
+    // Derived
+    allLeaves,
+    mk,
+    sprintStats,
+    totalStats,
+    showBreadcrumb,
+    showBoard,
+    // Actions
+    switchMilestone,
+    changeSidebarMonth,
+    toggleMilestones,
+    openBoard,
+    openSprintOverview,
+    closeBoard,
+    moveFrame,
+    dropSystem,
+    dropTask,
+    resizeFrame,
+    resizeLooseSystem,
+    createNewTask,
+    createNewSystem,
+    createNewFrame,
+    updateTaskStatus,
+    assignSprint,
+    unassignSprint,
+    updateTaskOrder,
+  };
+}

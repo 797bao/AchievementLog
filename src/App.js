@@ -8,6 +8,7 @@ import DevAchievements from './DevAchievements';
 import ArtAchievements from './ArtAchievements';
 import Quests from './Quests';
 import Inbox from './Inbox';
+import Planner from './Planner/Planner';
 import ShapeIcon from './ShapeIcon';
 import './App.css';
 
@@ -509,6 +510,15 @@ function App() {
               <span className="nav-count">{questCounts.completed}/{questCounts.total}</span>
             )}
           </li>
+
+          {/* Planner */}
+          <li
+            className={`nav-item ${activeSection === 'planner' ? 'active' : ''}`}
+            onClick={() => setActiveSection('planner')}
+          >
+            <span className="nav-icon" style={{ fontSize: '16px' }}>&#9776;</span>
+            <span className="nav-label">Planner</span>
+          </li>
         </ul>
         <div className="sidebar-footer">
           {authReady && !user && (
@@ -577,6 +587,7 @@ function App() {
           />
         </div>
       </main>
+      {activeSection === 'planner' && <Planner />}
     </div>
   );
 }
