@@ -50,13 +50,32 @@ export default function BoardView({
 
   const systemData = useMemo(() => {
     if (!currentBoardId) return null;
+
+    // Try as system/node first
     const node = findTask(currentBoardId, milestone);
-    if (!node) return null;
-    const allLeaves = getLeaves(node);
-    const prog = getProgress(node);
-    const expectedT = getTotalTime(node);
-    const loggedT = getLoggedTime(node);
-    return { node, allLeaves, prog, expectedT: formatTime(expectedT), loggedT: formatTime(loggedT), rawExpected: expectedT, rawLogged: loggedT };
+    if (node) {
+      const allLeaves = getLeaves(node);
+      const prog = getProgress(node);
+      const expectedT = getTotalTime(node);
+      const loggedT = getLoggedTime(node);
+      return { node, allLeaves, prog, expectedT: formatTime(expectedT), loggedT: formatTime(loggedT), rawExpected: expectedT, rawLogged: loggedT, isFrame: false };
+    }
+
+    // Try as frame
+    const frame = milestone.frames.find((f) => f.id === currentBoardId);
+    if (frame) {
+      let allLeaves = [];
+      frame.systems.forEach((sys) => { allLeaves = allLeaves.concat(getLeaves(sys)); });
+      (frame.tasks || []).forEach((t) => allLeaves.push(t));
+      const done = allLeaves.filter((l) => l.status === 'done').length;
+      const total = allLeaves.length;
+      const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+      let expectedT = 0, loggedT = 0;
+      allLeaves.forEach((l) => { expectedT += getTaskExpectedTime(l); loggedT += getTaskLoggedTime(l); });
+      return { node: null, frame, allLeaves, prog: { done, total, pct }, expectedT: formatTime(expectedT), loggedT: formatTime(loggedT), rawExpected: expectedT, rawLogged: loggedT, isFrame: true };
+    }
+
+    return null;
   }, [currentBoardId, milestone]);
 
   const boardKey = isSprintOverview
@@ -73,6 +92,25 @@ export default function BoardView({
     const node = findTask(currentBoardId, milestone);
     if (!node) return '';
     return findParentName(tid, node) || '';
+  };
+
+  const handleTitleClick = () => {
+    if (!onOpenModal || !systemData) return;
+    if (systemData.isFrame) {
+      onOpenModal({
+        type: 'rename-frame',
+        title: 'Rename Frame',
+        targetId: currentBoardId,
+        fields: [{ key: 'label', label: 'Label', type: 'text', value: systemData.frame?.label || '' }],
+      });
+    } else {
+      onOpenModal({
+        type: 'rename-system',
+        title: 'Rename System',
+        targetId: currentBoardId,
+        fields: [{ key: 'name', label: 'Name', type: 'text', value: systemData.node?.name || '' }],
+      });
+    }
   };
 
   const handleNewTask = () => {
@@ -129,7 +167,9 @@ export default function BoardView({
         <>
           <div className="board-header">
             <button className="board-back" onClick={onCloseBoard}>&#9664; Map</button>
-            <div className="board-title">{currentBoardPath}</div>
+            <div className="board-title board-title-editable" onClick={handleTitleClick} title="Click to rename">
+              {systemData.isFrame ? (systemData.frame?.label || 'Frame') : (systemData.node?.name || currentBoardPath)}
+            </div>
             <button className="board-new-task-btn" onClick={handleNewTask}>+ New Task</button>
           </div>
           <div className="board-stats">
@@ -138,10 +178,10 @@ export default function BoardView({
             <span className={`val${systemData.rawLogged > systemData.rawExpected && systemData.rawExpected > 0 ? ' time-over' : ''}`}>{systemData.loggedT}</span>/{systemData.expectedT}
           </div>
           <KanbanBoard
-            items={systemData.allLeaves} showSystem={false}
+            items={systemData.allLeaves} showSystem={!!systemData.isFrame}
             boardKey={boardKey} taskOrder={taskOrder}
             onStatusChange={onStatusChange} onUpdateTaskOrder={onUpdateTaskOrder}
-            getSystemName={() => ''} getParentName={getParentNameForTask}
+            getSystemName={getSystemName} getParentName={systemData.isFrame ? () => '' : getParentNameForTask}
             onOpenModal={onOpenModal} onDeleteTask={onDeleteTask}
           />
         </>

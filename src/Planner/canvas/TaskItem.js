@@ -15,7 +15,7 @@ export default function TaskItem({ task }) {
         style={{ backgroundColor: STATUS_COLORS[task.status] || STATUS_COLORS.planned }}
       />
       <img className="task-icon" src={iconFor(task.type)} alt={task.type} />
-      <div className={`task-name${isDone ? ' done' : ''}`}>{task.name}</div>
+      <div className={`task-name ${statusCls}${isDone ? ' done' : ''}`}>{task.name}</div>
       {(expectedMins > 0 || loggedMins > 0) && (
         <span className={`task-time ${statusCls}${loggedMins > expectedMins && expectedMins > 0 ? ' time-over' : ''}`}>
           {loggedMins > 0 ? `${formatTime(loggedMins)}/` : ''}{formatTime(expectedMins)}

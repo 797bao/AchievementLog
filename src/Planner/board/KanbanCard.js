@@ -47,6 +47,7 @@ export default function KanbanCard({
       data-task-id={task.id}
       onDragStart={(e) => onDragStart(e, task.id)}
       onDragEnd={onDragEnd}
+      onClick={openEdit}
       onContextMenu={openEdit}
     >
       <div

@@ -2,11 +2,13 @@ import { useState, useCallback, useMemo, useRef } from 'react';
 import { createSampleMilestones } from '../plannerData';
 import {
   getAllLeaves,
+  getLeaves,
   findTask,
   findInNode,
   removeTaskFromTree,
   removeSystemFromAny,
   autoLayoutMilestone,
+  deepCloneWithNewIds,
   monthKey,
   parseTime,
   formatTime,
@@ -282,13 +284,24 @@ export default function usePlannerState(initialData) {
         const targetSys = findTask(target.id, milestone);
         if (targetSys) {
           sysCopy.isGroup = true;
+          // Clear layout props from previous context (loose/frame positioning)
+          delete sysCopy.x;
+          delete sysCopy.y;
+          delete sysCopy.w;
+          delete sysCopy.h;
           if (!targetSys.children) targetSys.children = [];
           targetSys.children.push(sysCopy);
+          // Clear parent's explicit height so it auto-sizes to fit new content
+          delete targetSys.h;
         }
       } else {
         sysCopy.x = canvasPos.x;
         sysCopy.y = canvasPos.y;
-        sysCopy.w = 280;
+        // Preserve existing width; only set default if none exists
+        if (!sysCopy.w) {
+          const groupCount = (sysCopy.children || []).filter((c) => c.isGroup).length;
+          sysCopy.w = groupCount >= 2 ? 500 : 280;
+        }
         if (!milestone.looseSystems) milestone.looseSystems = [];
         milestone.looseSystems.push(sysCopy);
       }
@@ -520,14 +533,11 @@ export default function usePlannerState(initialData) {
     });
   }, [activeMilestoneIdx, updateMilestones]);
 
-  /* ─── Create task inside a system (from board view) ─── */
-  const createTaskInSystem = useCallback((parentSysId, taskData) => {
+  /* ─── Create task inside a system or frame (from board view) ─── */
+  const createTaskInSystem = useCallback((parentId, taskData) => {
     updateMilestones((ms) => {
-      const parent = findTask(parentSysId, ms[activeMilestoneIdx]);
-      if (!parent) return;
-      if (!parent.children) parent.children = [];
-      const curMk = monthKey(boardMonth.year, boardMonth.month);
-      parent.children.push({
+      const milestone = ms[activeMilestoneIdx];
+      const newTask = {
         id: 'task-' + Date.now(),
         name: taskData.name || 'New Task',
         type: taskData.type || 'script',
@@ -537,9 +547,24 @@ export default function usePlannerState(initialData) {
         description: taskData.description || '',
         sprint: null,
         completedAt: null,
-      });
+      };
+
+      // Try as system/node first
+      const parent = findTask(parentId, milestone);
+      if (parent) {
+        if (!parent.children) parent.children = [];
+        parent.children.push(newTask);
+        return;
+      }
+
+      // Try as frame
+      const frame = milestone.frames.find((f) => f.id === parentId);
+      if (frame) {
+        if (!frame.tasks) frame.tasks = [];
+        frame.tasks.push(newTask);
+      }
     });
-  }, [activeMilestoneIdx, boardMonth, updateMilestones]);
+  }, [activeMilestoneIdx, updateMilestones]);
 
   /* ─── Arrow actions ─── */
   const addArrow = useCallback((fromId, toId) => {
@@ -581,6 +606,31 @@ export default function usePlannerState(initialData) {
     updateMilestones((ms) => {
       const task = findTask(taskId, ms[activeMilestoneIdx]);
       if (task) task.sprint = null;
+    });
+  }, [activeMilestoneIdx, updateMilestones]);
+
+  /** Assign a sprint to every non-done leaf task inside a system/subsystem/frame */
+  const bulkSetSprint = useCallback((targetId, targetType, sprintKey) => {
+    updateMilestones((ms) => {
+      const milestone = ms[activeMilestoneIdx];
+      let tasks = [];
+
+      if (targetType === 'system') {
+        const sys = findTask(targetId, milestone);
+        if (sys) tasks = getLeaves(sys);
+      } else if (targetType === 'frame') {
+        const frame = milestone.frames.find((f) => f.id === targetId);
+        if (frame) {
+          frame.systems.forEach((sys) => { tasks = tasks.concat(getLeaves(sys)); });
+          (frame.tasks || []).forEach((t) => tasks.push(t));
+        }
+      }
+
+      tasks.forEach((t) => {
+        if (t.status !== 'done') {
+          t.sprint = sprintKey || null;
+        }
+      });
     });
   }, [activeMilestoneIdx, updateMilestones]);
 
@@ -711,6 +761,205 @@ export default function usePlannerState(initialData) {
     });
   }, [activeMilestoneIdx, updateMilestones]);
 
+  /* ─── Paste elements (from clipboard) ─── */
+  const pasteElements = useCallback((elements, canvasPos) => {
+    updateMilestones((ms) => {
+      const milestone = ms[activeMilestoneIdx];
+      const px = canvasPos.x;
+      const py = canvasPos.y;
+
+      // Collect all original positions to find the group's bounding-box origin
+      const positions = [];
+      (elements.tasks || []).forEach((t) => { if (t.x != null) positions.push({ x: t.x, y: t.y || 0 }); });
+      (elements.systems || []).forEach((s) => { if (s.x != null) positions.push({ x: s.x, y: s.y || 0 }); });
+      (elements.frames || []).forEach((f) => { if (f.x != null) positions.push({ x: f.x, y: f.y || 0 }); });
+      (elements.images || []).forEach((img) => { if (img.x != null) positions.push({ x: img.x, y: img.y || 0 }); });
+
+      // Origin = top-left of the group; offsets are relative to this
+      const originX = positions.length ? Math.min(...positions.map((p) => p.x)) : 0;
+      const originY = positions.length ? Math.min(...positions.map((p) => p.y)) : 0;
+
+      let stagger = 0; // small offset for elements that had no position (came from inside a system)
+
+      (elements.tasks || []).forEach((t) => {
+        const { clone } = deepCloneWithNewIds(t);
+        if (t.x != null) {
+          clone.x = snapToGrid(px + (t.x - originX));
+          clone.y = snapToGrid(py + ((t.y || 0) - originY));
+        } else {
+          clone.x = snapToGrid(px + stagger);
+          clone.y = snapToGrid(py + stagger);
+          stagger += 30;
+        }
+        if (!milestone.looseTasks) milestone.looseTasks = [];
+        milestone.looseTasks.push(clone);
+      });
+
+      (elements.systems || []).forEach((s) => {
+        const { clone } = deepCloneWithNewIds(s);
+        if (s.x != null) {
+          clone.x = snapToGrid(px + (s.x - originX));
+          clone.y = snapToGrid(py + ((s.y || 0) - originY));
+        } else {
+          clone.x = snapToGrid(px + stagger);
+          clone.y = snapToGrid(py + stagger);
+          stagger += 30;
+        }
+        clone.w = s.w || 250;
+        if (!milestone.looseSystems) milestone.looseSystems = [];
+        milestone.looseSystems.push(clone);
+      });
+
+      (elements.frames || []).forEach((f) => {
+        const { clone } = deepCloneWithNewIds(f);
+        if (f.x != null) {
+          clone.x = snapToGrid(px + (f.x - originX));
+          clone.y = snapToGrid(py + ((f.y || 0) - originY));
+        } else {
+          clone.x = snapToGrid(px + stagger);
+          clone.y = snapToGrid(py + stagger);
+          stagger += 30;
+        }
+        milestone.frames.push(clone);
+      });
+
+      (elements.images || []).forEach((img) => {
+        const { clone } = deepCloneWithNewIds(img);
+        if (img.x != null) {
+          clone.x = snapToGrid(px + (img.x - originX));
+          clone.y = snapToGrid(py + ((img.y || 0) - originY));
+        } else {
+          clone.x = snapToGrid(px + stagger);
+          clone.y = snapToGrid(py + stagger);
+          stagger += 30;
+        }
+        if (!milestone.looseImages) milestone.looseImages = [];
+        milestone.looseImages.push(clone);
+      });
+    });
+  }, [activeMilestoneIdx, updateMilestones]);
+
+  /* ─── Drop multiple selected elements into a container ─── */
+  const dropSelected = useCallback((items, target) => {
+    if (!items || items.length === 0 || !target) return;
+    updateMilestones((ms) => {
+      const milestone = ms[activeMilestoneIdx];
+
+      items.forEach(({ id, type }) => {
+        // Don't drop an item into itself
+        if (id === target.id) return;
+
+        if (type === 'task') {
+          const taskNode = findTask(id, milestone);
+          if (!taskNode || taskNode.children) return;
+          const taskCopy = JSON.parse(JSON.stringify(taskNode));
+          removeTaskFromTree(id, milestone);
+
+          if (target.type === 'system' || target.type === 'subgroup') {
+            const targetNode = findTask(target.id, milestone);
+            if (targetNode) {
+              if (!targetNode.children) targetNode.children = [];
+              targetNode.children.push(taskCopy);
+            }
+          } else if (target.type === 'frame') {
+            const frame = milestone.frames.find((f) => f.id === target.id);
+            if (frame) {
+              if (!frame.tasks) frame.tasks = [];
+              frame.tasks.push(taskCopy);
+            }
+          }
+        } else if (type === 'system') {
+          const sysNode = findTask(id, milestone);
+          if (!sysNode) return;
+          // Prevent dropping into own descendant
+          if (findInNode(target.id, sysNode)) return;
+
+          const sysCopy = JSON.parse(JSON.stringify(sysNode));
+          removeSystemFromAny(id, milestone);
+
+          if (target.type === 'frame') {
+            const targetFrame = milestone.frames.find((f) => f.id === target.id);
+            if (targetFrame) targetFrame.systems.push(sysCopy);
+          } else if (target.type === 'system' || target.type === 'subgroup') {
+            const targetSys = findTask(target.id, milestone);
+            if (targetSys) {
+              sysCopy.isGroup = true;
+              delete sysCopy.x;
+              delete sysCopy.y;
+              delete sysCopy.w;
+              delete sysCopy.h;
+              if (!targetSys.children) targetSys.children = [];
+              targetSys.children.push(sysCopy);
+              delete targetSys.h;
+            }
+          }
+        }
+        // Skip frames and images — they can't be dropped into containers
+      });
+
+      // Clean up empty standalone frames
+      milestone.frames = milestone.frames.filter(
+        (f) => !f.standalone || f.systems.length > 0
+      );
+    });
+  }, [activeMilestoneIdx, updateMilestones]);
+
+  /* ─── Move multiple selected elements by a delta ─── */
+  const moveSelected = useCallback((items, dx, dy) => {
+    if (!items || items.length === 0) return;
+    updateMilestones((ms) => {
+      const milestone = ms[activeMilestoneIdx];
+      items.forEach(({ id, type }) => {
+        if (type === 'frame') {
+          const frame = milestone.frames.find((f) => f.id === id);
+          if (frame) { frame.x = (frame.x || 0) + dx; frame.y = (frame.y || 0) + dy; }
+        } else if (type === 'task') {
+          const task = (milestone.looseTasks || []).find((t) => t.id === id);
+          if (task) { task.x = (task.x || 0) + dx; task.y = (task.y || 0) + dy; }
+        } else if (type === 'system') {
+          const sys = (milestone.looseSystems || []).find((s) => s.id === id);
+          if (sys) { sys.x = (sys.x || 0) + dx; sys.y = (sys.y || 0) + dy; }
+        } else if (type === 'image') {
+          const img = (milestone.looseImages || []).find((i) => i.id === id);
+          if (img) { img.x = (img.x || 0) + dx; img.y = (img.y || 0) + dy; }
+        }
+      });
+    });
+  }, [activeMilestoneIdx, updateMilestones]);
+
+  /* ─── Delete multiple selected elements ─── */
+  const deleteSelected = useCallback((items) => {
+    if (!items || items.length === 0) return;
+    updateMilestones((ms) => {
+      const milestone = ms[activeMilestoneIdx];
+      items.forEach(({ id, type }) => {
+        if (type === 'task') removeTaskFromTree(id, milestone);
+        else if (type === 'system') removeSystemFromAny(id, milestone);
+        else if (type === 'frame') {
+          milestone.frames = milestone.frames.filter((f) => f.id !== id);
+        }
+        else if (type === 'image') {
+          if (milestone.looseImages) {
+            milestone.looseImages = milestone.looseImages.filter((i) => i.id !== id);
+          }
+          // Also try removing from systems
+          const allSystems = [];
+          milestone.frames.forEach((f) => f.systems.forEach((s) => allSystems.push(s)));
+          (milestone.looseSystems || []).forEach((s) => allSystems.push(s));
+          allSystems.forEach((sys) => {
+            if (sys.images) sys.images = sys.images.filter((i) => i.id !== id);
+          });
+        }
+        // Clean up arrows referencing deleted element
+        if (milestone.arrows) {
+          milestone.arrows = milestone.arrows.filter(
+            (a) => a.fromId !== id && a.toId !== id
+          );
+        }
+      });
+    });
+  }, [activeMilestoneIdx, updateMilestones]);
+
   /* ─── Ensure layout ─── */
   autoLayoutMilestone(activeMilestone);
 
@@ -773,6 +1022,7 @@ export default function usePlannerState(initialData) {
     deleteArrow,
     assignSprint,
     unassignSprint,
+    bulkSetSprint,
     updateTaskOrder,
     resizeSubNode,
     addImageToSystem,
@@ -783,5 +1033,9 @@ export default function usePlannerState(initialData) {
     deleteLooseImage,
     moveImageLayer,
     detachImageFromSystem,
+    pasteElements,
+    moveSelected,
+    dropSelected,
+    deleteSelected,
   };
 }

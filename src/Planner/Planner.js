@@ -198,6 +198,11 @@ function PlannerInner({ initialData, onSave }) {
           onDeleteLooseImage={state.deleteLooseImage}
           onMoveImageLayer={state.moveImageLayer}
           onDetachImage={state.detachImageFromSystem}
+          onPasteElements={state.pasteElements}
+          onDeleteSelected={state.deleteSelected}
+          onMoveSelected={state.moveSelected}
+          onDropSelected={state.dropSelected}
+          onBulkSetSprint={state.bulkSetSprint}
         />
 
         {!state.isMetricsView && (

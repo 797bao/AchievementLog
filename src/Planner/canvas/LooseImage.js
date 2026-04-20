@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function LooseImage({ image }) {
+export default function LooseImage({ image, selected }) {
   const transform = [
     image.flipH ? 'scaleX(-1)' : '',
     image.flipV ? 'scaleY(-1)' : '',
@@ -8,7 +8,7 @@ export default function LooseImage({ image }) {
 
   return (
     <div
-      className="planner-img-wrap planner-img-loose"
+      className={`planner-img-wrap planner-img-loose${selected ? ' selected' : ''}`}
       data-img-id={image.id}
       data-img-loose="1"
       style={{

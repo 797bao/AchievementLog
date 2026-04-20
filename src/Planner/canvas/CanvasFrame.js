@@ -4,7 +4,7 @@ import TaskItem from './TaskItem';
 import ResizeHandle from './ResizeHandle';
 import { getFrameTotalTime, getFrameLoggedTime, formatTime } from '../plannerHelpers';
 
-export default function CanvasFrame({ frame }) {
+export default function CanvasFrame({ frame, selected }) {
   const totalT = getFrameTotalTime(frame);
   const loggedT = getFrameLoggedTime(frame);
   const showTime = totalT > 0 || loggedT > 0;
@@ -12,7 +12,7 @@ export default function CanvasFrame({ frame }) {
 
   return (
     <div
-      className="canvas-node canvas-frame"
+      className={`canvas-node canvas-frame${selected ? ' selected' : ''}`}
       data-frame-id={frame.id}
       style={{ left: frame.x, top: frame.y, width: frame.w || 600 }}
     >

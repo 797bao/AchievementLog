@@ -285,6 +285,52 @@ export function removeSystemFromAny(sysId, ms) {
   return false;
 }
 
+/* ─── Deep clone with new IDs (for copy/paste) ─── */
+export function deepCloneWithNewIds(element) {
+  const idMap = {};
+  let counter = 0;
+  const ts = Date.now();
+
+  function newId(prefix) {
+    return prefix + '-' + ts + '-' + (counter++);
+  }
+
+  function cloneNode(node) {
+    const clone = JSON.parse(JSON.stringify(node));
+    const oldId = clone.id;
+    const prefix = oldId ? oldId.split('-')[0] : 'elem';
+    clone.id = newId(prefix);
+    idMap[oldId] = clone.id;
+    if (clone.children) {
+      clone.children = clone.children.map((c) => cloneNode(c));
+    }
+    if (clone.images) {
+      clone.images = clone.images.map((img) => {
+        const oldImgId = img.id;
+        img.id = newId('img');
+        idMap[oldImgId] = img.id;
+        return img;
+      });
+    }
+    if (clone.systems) {
+      clone.systems = clone.systems.map((s) => cloneNode(s));
+    }
+    if (clone.tasks) {
+      clone.tasks = clone.tasks.map((t) => cloneNode(t));
+    }
+    if (clone.timeLogs) {
+      clone.timeLogs = clone.timeLogs.map((tl) => ({
+        ...tl,
+        id: newId('tl'),
+      }));
+    }
+    return clone;
+  }
+
+  const clone = cloneNode(element);
+  return { clone, idMap };
+}
+
 /* ─── Auto-layout ─── */
 export function estimateSysHeight(sys) {
   let h = 80;

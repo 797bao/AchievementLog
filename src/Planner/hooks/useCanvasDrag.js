@@ -2,14 +2,20 @@ import { useRef, useCallback } from 'react';
 import { CLICK_THRESHOLD } from '../plannerData';
 import { snapToGrid } from '../plannerHelpers';
 
-export default function useCanvasDrag({ mapZoom, screenToCanvas, onDropTask, onDropSystem, onMoveFrame, onMapClick }) {
+export default function useCanvasDrag({ mapZoom, screenToCanvas, onDropTask, onDropSystem, onMoveFrame, onMapClick, selectionRef, onMoveSelected, onDropSelected }) {
   const dragRef = useRef(null);
 
-  const createGhost = (el, e) => {
+  const createGhost = (el, e, multiCount) => {
     const r = el.getBoundingClientRect();
     const ghost = el.cloneNode(true);
     ghost.id = 'drag-ghost';
     ghost.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;pointer-events:none;z-index:10000;opacity:.85;box-shadow:0 12px 32px rgba(0,0,0,.5);border-radius:10px;transform:rotate(1deg) scale(1.02);transition:none;`;
+    if (multiCount > 1) {
+      const badge = document.createElement('div');
+      badge.className = 'drag-count-badge';
+      badge.textContent = multiCount;
+      ghost.appendChild(badge);
+    }
     document.body.appendChild(ghost);
     return { el: ghost, ox: e.clientX - r.left, oy: e.clientY - r.top };
   };
@@ -71,9 +77,14 @@ export default function useCanvasDrag({ mapZoom, screenToCanvas, onDropTask, onD
     const frameDragBar = e.target.closest('.frame-drag-bar');
     const standaloneEl = e.target.closest('.standalone-node');
 
+    // Check if the element being dragged is part of a multi-selection
+    const sel = selectionRef ? selectionRef.current : [];
+    const isMulti = (id) => sel.length > 1 && sel.some((s) => s.id === id);
+
     // Compute grab offset in screen pixels from element's top-left
     const initDrag = (type, id, srcEl, extras = {}) => {
       const r = srcEl.getBoundingClientRect();
+      const multiDrag = isMulti(id);
       dragRef.current = {
         type,
         id,
@@ -84,6 +95,8 @@ export default function useCanvasDrag({ mapZoom, screenToCanvas, onDropTask, onD
         grabScreenOy: e.clientY - r.top,
         ghost: null,
         dragging: false,
+        isMultiDrag: multiDrag,
+        multiCount: multiDrag ? sel.length : 1,
         ...extras,
       };
       e.preventDefault();
@@ -123,7 +136,7 @@ export default function useCanvasDrag({ mapZoom, screenToCanvas, onDropTask, onD
     if (!state.dragging) {
       if (Math.abs(dx) > CLICK_THRESHOLD || Math.abs(dy) > CLICK_THRESHOLD) {
         state.dragging = true;
-        state.ghost = createGhost(state.srcEl, e);
+        state.ghost = createGhost(state.srcEl, e, state.multiCount || 1);
         state.srcEl.classList.add('canvas-dragging');
       }
       return true;
@@ -151,6 +164,19 @@ export default function useCanvasDrag({ mapZoom, screenToCanvas, onDropTask, onD
     state.srcEl.classList.remove('canvas-dragging');
     removeGhost();
 
+    // Multi-drag: check for drop target first, then fall back to move-by-delta
+    if (state.isMultiDrag && selectionRef) {
+      const target = findDropTargetAt(e.clientX, e.clientY, state.type, state.id);
+      if (target && onDropSelected) {
+        onDropSelected(selectionRef.current, target);
+      } else if (onMoveSelected) {
+        const ddx = snapToGrid((e.clientX - state.mouseX) / mapZoom);
+        const ddy = snapToGrid((e.clientY - state.mouseY) / mapZoom);
+        onMoveSelected(selectionRef.current, ddx, ddy);
+      }
+      return true;
+    }
+
     // Compute canvas position adjusted for grab offset
     const rawCp = screenToCanvas(e.clientX, e.clientY, vpRect);
     const cp = {
@@ -171,7 +197,7 @@ export default function useCanvasDrag({ mapZoom, screenToCanvas, onDropTask, onD
     }
 
     return true;
-  }, [mapZoom, screenToCanvas, onDropTask, onDropSystem, onMoveFrame, onMapClick]);
+  }, [mapZoom, screenToCanvas, onDropTask, onDropSystem, onMoveFrame, onMapClick, onMoveSelected, onDropSelected]);
 
   const isDragging = useCallback(() => {
     return dragRef.current !== null;

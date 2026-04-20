@@ -25,6 +25,7 @@ export const TYPE_ICON_FILES = {
   fx: `${PUB}/icons/Effects.png`,
   rig: `${PUB}/icons/Rig.png`,
   scene: `${PUB}/icons/Scene.png`,
+  misc: `${PUB}/icons/Misc.png`,
   props: `${PUB}/icons/Properties.png`,
   ui: `${PUB}/icons/Scripts.png`,
   prefab: `${PUB}/icons/Properties.png`,

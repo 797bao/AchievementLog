@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import ColorPicker from './ColorPicker';
-import { STATUS_COLORS, STATUS_LABELS, STATUSES } from '../plannerData';
+import { STATUS_COLORS, STATUS_LABELS, STATUSES, MONTH_NAMES } from '../plannerData';
 
 /* ─── Canvas context menu (right-click on empty space) ─── */
-function CanvasMenu({ onNewTask, onNewSystem, onNewFrame, onAddImage, canvasX, canvasY, onClose }) {
+function CanvasMenu({ onNewTask, onNewSystem, onNewFrame, onAddImage, onPaste, hasClipboard, canvasX, canvasY, onClose }) {
   const act = (fn) => { fn(); onClose(); };
   return (
     <>
@@ -13,12 +13,18 @@ function CanvasMenu({ onNewTask, onNewSystem, onNewFrame, onAddImage, canvasX, c
       <div className="ctx-item" onClick={() => act(onNewFrame)}>&#9634; New Frame</div>
       <div className="ctx-sep" />
       <div className="ctx-item" onClick={() => { onAddImage(null, canvasX, canvasY); onClose(); }}>&#128247; Add Image</div>
+      {hasClipboard && (
+        <>
+          <div className="ctx-sep" />
+          <div className="ctx-item" onClick={() => { onPaste(canvasX, canvasY); onClose(); }}>&#128203; Paste</div>
+        </>
+      )}
     </>
   );
 }
 
 /* ─── Task context menu ─── */
-function TaskMenu({ targetId, targetData, onOpenModal, onUpdateTaskStatus, onDeleteTask, onStartArrow, onClose }) {
+function TaskMenu({ targetId, targetData, onOpenModal, onUpdateTaskStatus, onDeleteTask, onStartArrow, onCopy, onClose }) {
   const [showStatus, setShowStatus] = useState(false);
 
   const handleEdit = () => {
@@ -43,19 +49,14 @@ function TaskMenu({ targetId, targetData, onOpenModal, onUpdateTaskStatus, onDel
     onClose();
   };
 
-  const handleArrow = () => {
-    onStartArrow(targetId);
-    onClose();
-  };
-
-  const handleDelete = () => {
-    onDeleteTask(targetId);
-    onClose();
-  };
+  const handleArrow = () => { onStartArrow(targetId); onClose(); };
+  const handleDelete = () => { onDeleteTask(targetId); onClose(); };
+  const handleCopy = () => { onCopy(); onClose(); };
 
   return (
     <>
       <div className="ctx-item" onClick={handleEdit}>&#9998; Edit Task</div>
+      <div className="ctx-item" onClick={handleCopy}>&#128203; Copy</div>
       <div className="ctx-sep" />
       <div className="ctx-item" onClick={() => setShowStatus(!showStatus)}>
         &#9679; Status {showStatus ? '\u25BE' : '\u25B8'}
@@ -82,9 +83,44 @@ function TaskMenu({ targetId, targetData, onOpenModal, onUpdateTaskStatus, onDel
   );
 }
 
+/* ─── Inline sprint picker for bulk assign ─── */
+function SprintSubMenu({ targetId, targetType, onBulkSetSprint, onClose }) {
+  const now = new Date();
+  const curYear = now.getFullYear();
+  const curMonth = now.getMonth();
+  const currentSprint = curYear + '-' + curMonth;
+  const currentLabel = MONTH_NAMES[curMonth] + ' ' + curYear;
+
+  const options = [];
+  const startYear = 2026;
+  for (let y = startYear; y <= curYear + 1; y++) {
+    for (let m = 0; m < 12; m++) {
+      const val = y + '-' + m;
+      if (val !== currentSprint) options.push({ label: MONTH_NAMES[m] + ' ' + y, value: val });
+    }
+  }
+
+  const pick = (val) => { onBulkSetSprint(targetId, targetType, val); onClose(); };
+
+  return (
+    <div className="ctx-sprint-list">
+      <div className="ctx-sprint-item ctx-sprint-current" onClick={() => pick(currentSprint)}>
+        {currentLabel}<span className="ctx-sprint-badge">Current</span>
+      </div>
+      <div className="ctx-sep" />
+      <div className="ctx-sprint-item ctx-sprint-none" onClick={() => pick(null)}>None (clear)</div>
+      <div className="ctx-sep" />
+      {options.map((o) => (
+        <div key={o.value} className="ctx-sprint-item" onClick={() => pick(o.value)}>{o.label}</div>
+      ))}
+    </div>
+  );
+}
+
 /* ─── System context menu ─── */
-function SystemMenu({ targetId, targetData, onOpenModal, onCreateSubSystem, onUpdateSystemColors, onDeleteSystem, onStartArrow, onAddImage, onClose }) {
+function SystemMenu({ targetId, targetData, onOpenModal, onCreateSubSystem, onUpdateSystemColors, onDeleteSystem, onStartArrow, onAddImage, onCopy, onBulkSetSprint, onClose }) {
   const [showColors, setShowColors] = useState(false);
+  const [showSprint, setShowSprint] = useState(false);
   const [headerBg, setHeaderBg] = useState(targetData?.headerBg || '#23262e');
   const [headerText, setHeaderText] = useState(targetData?.headerText || '#e8eaed');
 
@@ -98,42 +134,27 @@ function SystemMenu({ targetId, targetData, onOpenModal, onCreateSubSystem, onUp
     onClose();
   };
 
-  const handleAddSub = () => {
-    onCreateSubSystem(targetId);
-    onClose();
-  };
-
-  const handleAddImage = () => {
-    if (onAddImage) onAddImage(targetId);
-    onClose();
-  };
-
-  const handleBgChange = (color) => {
-    setHeaderBg(color);
-    onUpdateSystemColors(targetId, { headerBg: color });
-  };
-
-  const handleTextChange = (color) => {
-    setHeaderText(color);
-    onUpdateSystemColors(targetId, { headerText: color });
-  };
-
-  const handleArrow = () => {
-    onStartArrow(targetId);
-    onClose();
-  };
-
-  const handleDelete = () => {
-    onDeleteSystem(targetId);
-    onClose();
-  };
+  const handleAddSub = () => { onCreateSubSystem(targetId); onClose(); };
+  const handleAddImage = () => { if (onAddImage) onAddImage(targetId); onClose(); };
+  const handleBgChange = (color) => { setHeaderBg(color); onUpdateSystemColors(targetId, { headerBg: color }); };
+  const handleTextChange = (color) => { setHeaderText(color); onUpdateSystemColors(targetId, { headerText: color }); };
+  const handleArrow = () => { onStartArrow(targetId); onClose(); };
+  const handleDelete = () => { onDeleteSystem(targetId); onClose(); };
+  const handleCopy = () => { onCopy(); onClose(); };
 
   return (
     <>
       <div className="ctx-item" onClick={handleRename}>&#9998; Rename</div>
+      <div className="ctx-item" onClick={handleCopy}>&#128203; Copy</div>
       <div className="ctx-item" onClick={handleAddSub}>&#10010; New Sub-System</div>
       <div className="ctx-item" onClick={handleAddImage}>&#128247; Add Image</div>
       <div className="ctx-sep" />
+      <div className="ctx-item" onClick={() => setShowSprint(!showSprint)}>
+        &#128197; Set Sprint (all tasks) {showSprint ? '\u25BE' : '\u25B8'}
+      </div>
+      {showSprint && (
+        <SprintSubMenu targetId={targetId} targetType="system" onBulkSetSprint={onBulkSetSprint} onClose={onClose} />
+      )}
       <div className="ctx-item" onClick={() => setShowColors(!showColors)}>
         &#127912; Edit Colors {showColors ? '\u25BE' : '\u25B8'}
       </div>
@@ -153,7 +174,7 @@ function SystemMenu({ targetId, targetData, onOpenModal, onCreateSubSystem, onUp
 }
 
 /* ─── Image context menu ─── */
-function ImageMenu({ targetId, targetData, onUpdateImage, onUpdateLooseImage, onDeleteImage, onDeleteLooseImage, onMoveImageLayer, onDetachImage, canvasX, canvasY, onClose }) {
+function ImageMenu({ targetId, targetData, onUpdateImage, onUpdateLooseImage, onDeleteImage, onDeleteLooseImage, onMoveImageLayer, onDetachImage, onCopy, canvasX, canvasY, onClose }) {
   const isLoose = !!targetData?.isLoose;
   const sysId = targetData?.sysId;
   const imgId = targetId;
@@ -166,15 +187,8 @@ function ImageMenu({ targetId, targetData, onUpdateImage, onUpdateLooseImage, on
 
   const handleFlipH = () => { doUpdate({ flipH: !targetData?.flipH }); onClose(); };
   const handleFlipV = () => { doUpdate({ flipV: !targetData?.flipV }); onClose(); };
-
-  const handlePriorityUp = () => {
-    doUpdate({ zIndex: priority + 1 });
-    onClose();
-  };
-  const handlePriorityDown = () => {
-    doUpdate({ zIndex: Math.max(0, priority - 1) });
-    onClose();
-  };
+  const handlePriorityUp = () => { doUpdate({ zIndex: priority + 1 }); onClose(); };
+  const handlePriorityDown = () => { doUpdate({ zIndex: Math.max(0, priority - 1) }); onClose(); };
 
   const handleDetach = () => {
     if (sysId && onDetachImage) onDetachImage(sysId, imgId, canvasX || 100, canvasY || 100);
@@ -187,8 +201,12 @@ function ImageMenu({ targetId, targetData, onUpdateImage, onUpdateLooseImage, on
     onClose();
   };
 
+  const handleCopy = () => { onCopy(); onClose(); };
+
   return (
     <>
+      <div className="ctx-item" onClick={handleCopy}>&#128203; Copy</div>
+      <div className="ctx-sep" />
       <div className="ctx-item ctx-info">Priority: {priority}</div>
       <div className="ctx-item" onClick={handlePriorityUp}>&#9650; Priority Up (higher = on top)</div>
       <div className="ctx-item" onClick={handlePriorityDown}>&#9660; Priority Down</div>
@@ -208,7 +226,9 @@ function ImageMenu({ targetId, targetData, onUpdateImage, onUpdateLooseImage, on
 }
 
 /* ─── Frame context menu ─── */
-function FrameMenu({ targetId, targetData, onOpenModal, onDeleteFrame, onStartArrow, onClose }) {
+function FrameMenu({ targetId, targetData, onOpenModal, onDeleteFrame, onStartArrow, onCopy, onBulkSetSprint, onClose }) {
+  const [showSprint, setShowSprint] = useState(false);
+
   const handleRename = () => {
     onOpenModal({
       type: 'rename-frame',
@@ -219,19 +239,21 @@ function FrameMenu({ targetId, targetData, onOpenModal, onDeleteFrame, onStartAr
     onClose();
   };
 
-  const handleArrow = () => {
-    onStartArrow(targetId);
-    onClose();
-  };
-
-  const handleDelete = () => {
-    onDeleteFrame(targetId);
-    onClose();
-  };
+  const handleArrow = () => { onStartArrow(targetId); onClose(); };
+  const handleDelete = () => { onDeleteFrame(targetId); onClose(); };
+  const handleCopy = () => { onCopy(); onClose(); };
 
   return (
     <>
       <div className="ctx-item" onClick={handleRename}>&#9998; Rename</div>
+      <div className="ctx-item" onClick={handleCopy}>&#128203; Copy</div>
+      <div className="ctx-sep" />
+      <div className="ctx-item" onClick={() => setShowSprint(!showSprint)}>
+        &#128197; Set Sprint (all tasks) {showSprint ? '\u25BE' : '\u25B8'}
+      </div>
+      {showSprint && (
+        <SprintSubMenu targetId={targetId} targetType="frame" onBulkSetSprint={onBulkSetSprint} onClose={onClose} />
+      )}
       <div className="ctx-sep" />
       <div className="ctx-item" onClick={handleArrow}>&#10140; Draw Arrow</div>
       <div className="ctx-sep" />
@@ -251,18 +273,20 @@ export default function ContextMenu({
   onDeleteTask, onDeleteSystem, onDeleteFrame,
   onStartArrow,
   onAddImage, onUpdateImage, onUpdateLooseImage, onDeleteImage, onDeleteLooseImage, onMoveImageLayer, onDetachImage,
+  onCopy, onPaste, hasClipboard,
+  onBulkSetSprint,
   onClose,
 }) {
   return (
     <div className="context-menu" style={{ left: x, top: y }}>
       {type === 'canvas' && (
-        <CanvasMenu onNewTask={onNewTask} onNewSystem={onNewSystem} onNewFrame={onNewFrame} onAddImage={onAddImage} canvasX={canvasX} canvasY={canvasY} onClose={onClose} />
+        <CanvasMenu onNewTask={onNewTask} onNewSystem={onNewSystem} onNewFrame={onNewFrame} onAddImage={onAddImage} onPaste={onPaste} hasClipboard={hasClipboard} canvasX={canvasX} canvasY={canvasY} onClose={onClose} />
       )}
       {type === 'task' && (
         <TaskMenu
           targetId={targetId} targetData={targetData}
           onOpenModal={onOpenModal} onUpdateTaskStatus={onUpdateTaskStatus}
-          onDeleteTask={onDeleteTask} onStartArrow={onStartArrow} onClose={onClose}
+          onDeleteTask={onDeleteTask} onStartArrow={onStartArrow} onCopy={onCopy} onClose={onClose}
         />
       )}
       {type === 'system' && (
@@ -270,14 +294,14 @@ export default function ContextMenu({
           targetId={targetId} targetData={targetData}
           onOpenModal={onOpenModal} onCreateSubSystem={onCreateSubSystem}
           onUpdateSystemColors={onUpdateSystemColors} onDeleteSystem={onDeleteSystem}
-          onStartArrow={onStartArrow} onAddImage={onAddImage} onClose={onClose}
+          onStartArrow={onStartArrow} onAddImage={onAddImage} onCopy={onCopy} onBulkSetSprint={onBulkSetSprint} onClose={onClose}
         />
       )}
       {type === 'frame' && (
         <FrameMenu
           targetId={targetId} targetData={targetData}
           onOpenModal={onOpenModal} onDeleteFrame={onDeleteFrame}
-          onStartArrow={onStartArrow} onClose={onClose}
+          onStartArrow={onStartArrow} onCopy={onCopy} onBulkSetSprint={onBulkSetSprint} onClose={onClose}
         />
       )}
       {type === 'image' && (
@@ -287,7 +311,7 @@ export default function ContextMenu({
           onUpdateImage={onUpdateImage} onUpdateLooseImage={onUpdateLooseImage}
           onDeleteImage={onDeleteImage} onDeleteLooseImage={onDeleteLooseImage}
           onMoveImageLayer={onMoveImageLayer} onDetachImage={onDetachImage}
-          onClose={onClose}
+          onCopy={onCopy} onClose={onClose}
         />
       )}
     </div>

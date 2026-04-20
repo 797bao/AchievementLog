@@ -28,7 +28,8 @@
       "Bash(taskkill /F /IM serve.exe)",
       "Bash(curl -sL -o \"C:\\\\Users\\\\797ng\\\\Documents\\\\GitHub\\\\AchievementLog\\\\public\\\\fonts\\\\Virgil.woff2\" \"https://unpkg.com/@excalidraw/excalidraw@0.17.6/dist/excalidraw-assets/Virgil.woff2\")",
       "Bash(python3 -c ' *)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(xxd)"
     ]
   }
 }
