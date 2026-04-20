@@ -90,14 +90,7 @@ export default function CanvasViewport({
   } = useCanvasPanZoom();
 
   const handleMapClick = useCallback((state) => {
-    if (arrowMode) {
-      const toId = state.id || state.sysId;
-      if (toId && toId !== arrowMode.fromId) {
-        onAddArrow(arrowMode.fromId, toId);
-      }
-      setArrowMode(null);
-      return;
-    }
+    // Arrow mode is handled directly in handleMouseDown so any element edge counts as a target
     if (state.type === 'standalone' && state.sysId) {
       const sys = findTask(state.sysId, milestone);
       if (sys && onOpenBoard) onOpenBoard(state.sysId, sys.name);
@@ -108,7 +101,7 @@ export default function CanvasViewport({
       const frame = milestone.frames.find((f) => f.id === state.id);
       if (frame && onOpenBoard) onOpenBoard(state.id, frame.label || 'Frame');
     }
-  }, [milestone, onOpenBoard, arrowMode, onAddArrow]);
+  }, [milestone, onOpenBoard]);
 
   const { onMouseDown: dragMouseDown, onMouseMove: dragMouseMove, onMouseUp: dragMouseUp } = useCanvasDrag({
     mapZoom,
@@ -280,10 +273,27 @@ export default function CanvasViewport({
 
     if (e.button !== 0) return;
 
-    // Arrow mode
+    // Arrow mode — resolve target directly here so any part of a frame/system/task counts
     if (arrowMode) {
-      const nodeEl = e.target.closest('.task-item,.loose-task,.system-box,.canvas-frame,.standalone-node');
+      const nodeEl = e.target.closest('.task-item,.loose-task,.sub-group,.system-box,.canvas-frame,.standalone-node');
       if (!nodeEl) { setArrowMode(null); return; }
+      // Prefer most-specific id (task → sub-group → system → frame)
+      const taskEl = e.target.closest('.task-item') || e.target.closest('.loose-task');
+      const subGrpEl = e.target.closest('.sub-group');
+      const sysEl = e.target.closest('.system-box');
+      const frameEl = e.target.closest('.canvas-frame') || e.target.closest('.standalone-node');
+      const toId =
+        (taskEl && taskEl.dataset.taskId) ||
+        (subGrpEl && subGrpEl.dataset.sysId) ||
+        (sysEl && sysEl.dataset.sysId) ||
+        (frameEl && frameEl.dataset.frameId) ||
+        null;
+      if (toId && toId !== arrowMode.fromId) {
+        onAddArrow(arrowMode.fromId, toId);
+      }
+      setArrowMode(null);
+      e.preventDefault();
+      return;
     }
 
     // Shift+click: toggle selection
@@ -374,7 +384,7 @@ export default function CanvasViewport({
       startPan(e.clientX, e.clientY, false);
       e.preventDefault();
     }
-  }, [dragMouseDown, startPan, arrowMode, identifyElement, toggleSelect, clearSelection]);
+  }, [dragMouseDown, startPan, arrowMode, identifyElement, toggleSelect, clearSelection, onAddArrow]);
 
   const handleMouseMove = useCallback((e) => {
     // Right-click drag → selection box
