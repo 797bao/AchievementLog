@@ -550,7 +550,7 @@
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid #3c3f47;
   border-radius: 8px;
-  overflow: hidden;
+  overflow: visible;
   transition: all 0.15s;
   position: relative;
   flex: 1;
@@ -654,9 +654,25 @@
   background: rgba(52, 168, 83, 0.06);
 }
 
+/* Don't double-tint tasks inside a completed system/group */
+.system-done .task-item.task-done,
+.group-done .task-item.task-done {
+  background: transparent;
+}
+
+/* Hover highlight on completed tasks */
+.task-item.task-done:hover {
+  background: rgba(52, 168, 83, 0.12) !important;
+}
+
 .loose-task.task-done {
   background: rgba(52, 168, 83, 0.08);
   border-color: rgba(52, 168, 83, 0.2);
+}
+
+.loose-task.task-done:hover {
+  background: rgba(52, 168, 83, 0.14) !important;
+  border-color: rgba(52, 168, 83, 0.35);
 }
 
 .task-item .task-sprint {
@@ -2228,4 +2244,82 @@
 /* Frame minimum height for empty frames — easier to grab */
 .canvas-frame .frame-drag-bar {
   min-height: 30px;
+}
+
+/* ═══════════════════════════════════════
+   SUB-GROUP / SUB-SYSTEM RESIZE
+   ═══════════════════════════════════════ */
+
+.sub-group.resizable-node {
+  position: relative;
+  overflow: visible;
+}
+
+.resizable-node:hover > .resize-handle {
+  background: rgba(215, 104, 31, 0.12);
+}
+
+/* Ensure sub-group / system resize handles sit above parent elements */
+.sub-group > .resize-handle,
+.system-box.resizable-node > .resize-handle {
+  z-index: 10;
+}
+
+/* ═══════════════════════════════════════
+   PLANNER IMAGES
+   ═══════════════════════════════════════ */
+
+.planner-img-wrap {
+  cursor: grab;
+  user-select: none;
+}
+
+.planner-img-wrap:hover {
+  outline: 2px solid rgba(232, 152, 90, 0.5);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.planner-img-wrap:active {
+  cursor: grabbing;
+}
+
+/* Image resize handle (bottom-right) with enlarged hit area */
+.pimg-resize {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  width: 14px;
+  height: 14px;
+  background: #E8985A;
+  border: 2px solid #1a1b1e;
+  border-radius: 3px;
+  cursor: nwse-resize;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 2;
+}
+
+/* Invisible larger hit area (~10% of typical image size) */
+.pimg-resize::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  right: -10px;
+  bottom: -10px;
+  cursor: nwse-resize;
+}
+
+.planner-img-wrap:hover .pimg-resize {
+  opacity: 1;
+}
+
+/* Context menu image priority info */
+.ctx-info {
+  color: #E8985A;
+  font-weight: 600;
+  font-size: 11px;
+  cursor: default;
+  opacity: 0.8;
 }

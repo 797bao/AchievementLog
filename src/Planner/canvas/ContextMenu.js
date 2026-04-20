@@ -3,7 +3,7 @@ import ColorPicker from './ColorPicker';
 import { STATUS_COLORS, STATUS_LABELS, STATUSES } from '../plannerData';
 
 /* ─── Canvas context menu (right-click on empty space) ─── */
-function CanvasMenu({ onNewTask, onNewSystem, onNewFrame, onClose }) {
+function CanvasMenu({ onNewTask, onNewSystem, onNewFrame, onAddImage, canvasX, canvasY, onClose }) {
   const act = (fn) => { fn(); onClose(); };
   return (
     <>
@@ -11,6 +11,8 @@ function CanvasMenu({ onNewTask, onNewSystem, onNewFrame, onClose }) {
       <div className="ctx-sep" />
       <div className="ctx-item" onClick={() => act(onNewSystem)}>&#9744; New System</div>
       <div className="ctx-item" onClick={() => act(onNewFrame)}>&#9634; New Frame</div>
+      <div className="ctx-sep" />
+      <div className="ctx-item" onClick={() => { onAddImage(null, canvasX, canvasY); onClose(); }}>&#128247; Add Image</div>
     </>
   );
 }
@@ -81,7 +83,7 @@ function TaskMenu({ targetId, targetData, onOpenModal, onUpdateTaskStatus, onDel
 }
 
 /* ─── System context menu ─── */
-function SystemMenu({ targetId, targetData, onOpenModal, onCreateSubSystem, onUpdateSystemColors, onDeleteSystem, onStartArrow, onClose }) {
+function SystemMenu({ targetId, targetData, onOpenModal, onCreateSubSystem, onUpdateSystemColors, onDeleteSystem, onStartArrow, onAddImage, onClose }) {
   const [showColors, setShowColors] = useState(false);
   const [headerBg, setHeaderBg] = useState(targetData?.headerBg || '#23262e');
   const [headerText, setHeaderText] = useState(targetData?.headerText || '#e8eaed');
@@ -98,6 +100,11 @@ function SystemMenu({ targetId, targetData, onOpenModal, onCreateSubSystem, onUp
 
   const handleAddSub = () => {
     onCreateSubSystem(targetId);
+    onClose();
+  };
+
+  const handleAddImage = () => {
+    if (onAddImage) onAddImage(targetId);
     onClose();
   };
 
@@ -125,6 +132,7 @@ function SystemMenu({ targetId, targetData, onOpenModal, onCreateSubSystem, onUp
     <>
       <div className="ctx-item" onClick={handleRename}>&#9998; Rename</div>
       <div className="ctx-item" onClick={handleAddSub}>&#10010; New Sub-System</div>
+      <div className="ctx-item" onClick={handleAddImage}>&#128247; Add Image</div>
       <div className="ctx-sep" />
       <div className="ctx-item" onClick={() => setShowColors(!showColors)}>
         &#127912; Edit Colors {showColors ? '\u25BE' : '\u25B8'}
@@ -140,6 +148,61 @@ function SystemMenu({ targetId, targetData, onOpenModal, onCreateSubSystem, onUp
       <div className="ctx-item" onClick={handleArrow}>&#10140; Draw Arrow</div>
       <div className="ctx-sep" />
       <div className="ctx-item ctx-danger" onClick={handleDelete}>&#128465; Delete</div>
+    </>
+  );
+}
+
+/* ─── Image context menu ─── */
+function ImageMenu({ targetId, targetData, onUpdateImage, onUpdateLooseImage, onDeleteImage, onDeleteLooseImage, onMoveImageLayer, onDetachImage, canvasX, canvasY, onClose }) {
+  const isLoose = !!targetData?.isLoose;
+  const sysId = targetData?.sysId;
+  const imgId = targetId;
+  const priority = targetData?.zIndex || 0;
+
+  const doUpdate = (updates) => {
+    if (isLoose) onUpdateLooseImage(imgId, updates);
+    else onUpdateImage(sysId, imgId, updates);
+  };
+
+  const handleFlipH = () => { doUpdate({ flipH: !targetData?.flipH }); onClose(); };
+  const handleFlipV = () => { doUpdate({ flipV: !targetData?.flipV }); onClose(); };
+
+  const handlePriorityUp = () => {
+    doUpdate({ zIndex: priority + 1 });
+    onClose();
+  };
+  const handlePriorityDown = () => {
+    doUpdate({ zIndex: Math.max(0, priority - 1) });
+    onClose();
+  };
+
+  const handleDetach = () => {
+    if (sysId && onDetachImage) onDetachImage(sysId, imgId, canvasX || 100, canvasY || 100);
+    onClose();
+  };
+
+  const handleDelete = () => {
+    if (isLoose) onDeleteLooseImage(imgId);
+    else onDeleteImage(sysId, imgId);
+    onClose();
+  };
+
+  return (
+    <>
+      <div className="ctx-item ctx-info">Priority: {priority}</div>
+      <div className="ctx-item" onClick={handlePriorityUp}>&#9650; Priority Up (higher = on top)</div>
+      <div className="ctx-item" onClick={handlePriorityDown}>&#9660; Priority Down</div>
+      <div className="ctx-sep" />
+      <div className="ctx-item" onClick={handleFlipH}>&#8596; Flip Horizontal{targetData?.flipH ? ' \u2713' : ''}</div>
+      <div className="ctx-item" onClick={handleFlipV}>&#8597; Flip Vertical{targetData?.flipV ? ' \u2713' : ''}</div>
+      {!isLoose && sysId && (
+        <>
+          <div className="ctx-sep" />
+          <div className="ctx-item" onClick={handleDetach}>&#10548; Detach from System</div>
+        </>
+      )}
+      <div className="ctx-sep" />
+      <div className="ctx-item ctx-danger" onClick={handleDelete}>&#128465; Delete Image</div>
     </>
   );
 }
@@ -180,18 +243,20 @@ function FrameMenu({ targetId, targetData, onOpenModal, onDeleteFrame, onStartAr
 /* ─── Main ContextMenu component ─── */
 export default function ContextMenu({
   x, y, type = 'canvas', targetId, targetData,
+  canvasX, canvasY,
   onNewTask, onNewSystem, onNewFrame,
   onOpenModal,
   onUpdateTaskStatus,
   onCreateSubSystem, onUpdateSystemColors,
   onDeleteTask, onDeleteSystem, onDeleteFrame,
   onStartArrow,
+  onAddImage, onUpdateImage, onUpdateLooseImage, onDeleteImage, onDeleteLooseImage, onMoveImageLayer, onDetachImage,
   onClose,
 }) {
   return (
     <div className="context-menu" style={{ left: x, top: y }}>
       {type === 'canvas' && (
-        <CanvasMenu onNewTask={onNewTask} onNewSystem={onNewSystem} onNewFrame={onNewFrame} onClose={onClose} />
+        <CanvasMenu onNewTask={onNewTask} onNewSystem={onNewSystem} onNewFrame={onNewFrame} onAddImage={onAddImage} canvasX={canvasX} canvasY={canvasY} onClose={onClose} />
       )}
       {type === 'task' && (
         <TaskMenu
@@ -205,7 +270,7 @@ export default function ContextMenu({
           targetId={targetId} targetData={targetData}
           onOpenModal={onOpenModal} onCreateSubSystem={onCreateSubSystem}
           onUpdateSystemColors={onUpdateSystemColors} onDeleteSystem={onDeleteSystem}
-          onStartArrow={onStartArrow} onClose={onClose}
+          onStartArrow={onStartArrow} onAddImage={onAddImage} onClose={onClose}
         />
       )}
       {type === 'frame' && (
@@ -213,6 +278,16 @@ export default function ContextMenu({
           targetId={targetId} targetData={targetData}
           onOpenModal={onOpenModal} onDeleteFrame={onDeleteFrame}
           onStartArrow={onStartArrow} onClose={onClose}
+        />
+      )}
+      {type === 'image' && (
+        <ImageMenu
+          targetId={targetId} targetData={targetData}
+          canvasX={canvasX} canvasY={canvasY}
+          onUpdateImage={onUpdateImage} onUpdateLooseImage={onUpdateLooseImage}
+          onDeleteImage={onDeleteImage} onDeleteLooseImage={onDeleteLooseImage}
+          onMoveImageLayer={onMoveImageLayer} onDetachImage={onDetachImage}
+          onClose={onClose}
         />
       )}
     </div>

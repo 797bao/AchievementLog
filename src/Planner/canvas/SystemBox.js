@@ -1,6 +1,8 @@
 import React from 'react';
 import SubGroup from './SubGroup';
 import TaskItem from './TaskItem';
+import SystemImage from './SystemImage';
+import ResizeHandle from './ResizeHandle';
 import {
   getProgress,
   getProgressColor,
@@ -10,7 +12,7 @@ import {
   formatTime,
 } from '../plannerHelpers';
 
-export default function SystemBox({ system, depth = 0 }) {
+export default function SystemBox({ system, depth = 0, resizable = false }) {
   const prog = getProgress(system);
   const progClass = getProgressClass(prog.pct);
   const expectedT = getTotalTime(system);
@@ -19,6 +21,7 @@ export default function SystemBox({ system, depth = 0 }) {
   // Separate children into groups (isGroup) and loose tasks
   const groups = (system.children || []).filter((c) => c.isGroup);
   const loose = (system.children || []).filter((c) => !c.isGroup);
+  const images = system.images || [];
 
   // Custom header colors
   const headerStyle = {};
@@ -26,11 +29,20 @@ export default function SystemBox({ system, depth = 0 }) {
   const nameStyle = {};
   if (system.headerText) nameStyle.color = system.headerText;
 
+  // Inline size from persisted w/h
+  const sizeStyle = {};
+  if (resizable && system.w) { sizeStyle.width = system.w; sizeStyle.flex = 'none'; }
+  if (resizable && system.h) { sizeStyle.height = system.h; }
+
   // Prevent infinite recursion
   if (depth > 5) return <div className="system-box-overflow">Max nesting depth</div>;
 
   return (
-    <div className={`system-box${prog.pct === 100 ? ' system-done' : ''}`} data-sys-id={system.id}>
+    <div
+      className={`system-box${prog.pct === 100 ? ' system-done' : ''}${resizable ? ' resizable-node' : ''}`}
+      data-sys-id={system.id}
+      style={sizeStyle}
+    >
       <div className="system-box-header" style={headerStyle}>
         <div className="system-box-name" style={nameStyle}>{system.name}</div>
         {expectedT > 0 && (
@@ -54,7 +66,7 @@ export default function SystemBox({ system, depth = 0 }) {
           const hasNestedGroups = (g.children || []).some((c) => c.isGroup);
           return hasNestedGroups ? (
             <div key={g.id} className="nested-system-wrapper">
-              <SystemBox system={g} depth={depth + 1} />
+              <SystemBox system={g} depth={depth + 1} resizable />
             </div>
           ) : (
             <SubGroup key={g.id} group={g} />
@@ -68,6 +80,11 @@ export default function SystemBox({ system, depth = 0 }) {
           </div>
         )}
       </div>
+      {/* Images overlay */}
+      {images.map((img) => (
+        <SystemImage key={img.id} image={img} sysId={system.id} />
+      ))}
+      {resizable && <ResizeHandle directions={['r', 'b', 'rb']} />}
     </div>
   );
 }

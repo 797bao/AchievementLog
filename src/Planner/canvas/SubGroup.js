@@ -1,5 +1,6 @@
 import React from 'react';
 import TaskItem from './TaskItem';
+import ResizeHandle from './ResizeHandle';
 import { getProgress, getProgressClass, getTotalTime, getLoggedTime, formatTime } from '../plannerHelpers';
 
 export default function SubGroup({ group }) {
@@ -8,8 +9,12 @@ export default function SubGroup({ group }) {
   const expectedT = getTotalTime(group);
   const loggedT = getLoggedTime(group);
 
+  const style = {};
+  if (group.w) { style.width = group.w; style.flex = 'none'; }
+  if (group.h) { style.height = group.h; }
+
   return (
-    <div className={`sub-group${prog.pct === 100 ? ' group-done' : ''}`} data-sys-id={group.id}>
+    <div className={`sub-group resizable-node${prog.pct === 100 ? ' group-done' : ''}`} data-sys-id={group.id} style={style}>
       <div className="sub-group-header">
         <div className="sub-group-name">{group.name}</div>
         <span className="sub-group-time">{formatTime(loggedT)}/{formatTime(expectedT)}</span>
@@ -26,6 +31,7 @@ export default function SubGroup({ group }) {
           )
         )}
       </div>
+      <ResizeHandle directions={['r', 'b', 'rb']} />
     </div>
   );
 }

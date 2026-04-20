@@ -3,6 +3,7 @@ import CanvasFrame from './CanvasFrame';
 import StandaloneNode from './StandaloneNode';
 import LooseSystem from './LooseSystem';
 import LooseTask from './LooseTask';
+import LooseImage from './LooseImage';
 import ContextMenu from './ContextMenu';
 import ArrowLayer from './ArrowLayer';
 import useCanvasPanZoom from '../hooks/useCanvasPanZoom';
@@ -19,6 +20,7 @@ export default function CanvasViewport({
   onDropTask,
   onResizeFrame,
   onResizeLooseSystem,
+  onResizeSubNode,
   onCreateTask,
   onCreateSystem,
   onCreateFrame,
@@ -36,9 +38,20 @@ export default function CanvasViewport({
   onAddArrow,
   onDeleteArrow,
   onOpenModal,
+  onAddImage,
+  onAddLooseImage,
+  onUpdateImage,
+  onUpdateLooseImage,
+  onDeleteImage,
+  onDeleteLooseImage,
+  onMoveImageLayer,
+  onDetachImage,
 }) {
   const vpRef = useRef(null);
   const mapInnerRef = useRef(null);
+  // Always-fresh milestone ref to avoid stale closure in mouseDown
+  const milestoneRef = useRef(milestone);
+  milestoneRef.current = milestone;
 
   // Arrow drawing mode: { fromId } or null
   const [arrowMode, setArrowMode] = useState(null);
@@ -91,6 +104,7 @@ export default function CanvasViewport({
   const { contextMenu, showContextMenu, closeContextMenu } = useContextMenu();
 
   const resizeRef = useRef(null);
+  const imgDragRef = useRef(null);
 
   // Cancel arrow mode on Escape + highlight source element + track mouse for preview
   useEffect(() => {
@@ -153,9 +167,62 @@ export default function CanvasViewport({
       // Let drag system handle the click→release→mapClick path
     }
 
+    // Image resize handle
+    const imgResize = e.target.closest('[data-pimg-resize]');
+    if (imgResize) {
+      const wrap = imgResize.closest('.planner-img-wrap');
+      if (wrap) {
+        const imgId = wrap.dataset.imgId;
+        const isLoose = !!wrap.dataset.imgLoose;
+        const sysId = wrap.dataset.imgSys || null;
+        let imgData = null;
+        const ms = milestoneRef.current;
+        if (isLoose) {
+          imgData = (ms.looseImages || []).find((i) => i.id === imgId);
+        } else if (sysId) {
+          const sys = findTask(sysId, ms);
+          imgData = sys && sys.images ? sys.images.find((i) => i.id === imgId) : null;
+        }
+        if (imgData) {
+          imgDragRef.current = { mode: 'resize', isLoose, sysId, imgId, startX: e.clientX, startY: e.clientY, startW: imgData.w, startH: imgData.h };
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+      }
+    }
+
+    // Image drag (center-to-cursor)
+    const imgWrap = e.target.closest('.planner-img-wrap');
+    if (imgWrap) {
+      const imgId = imgWrap.dataset.imgId;
+      const isLoose = !!imgWrap.dataset.imgLoose;
+      const sysId = imgWrap.dataset.imgSys || null;
+      let imgData = null;
+      const ms = milestoneRef.current;
+      if (isLoose) {
+        imgData = (ms.looseImages || []).find((i) => i.id === imgId);
+      } else if (sysId) {
+        const sys = findTask(sysId, ms);
+        imgData = sys && sys.images ? sys.images.find((i) => i.id === imgId) : null;
+      }
+      if (imgData) {
+        // Standard offset drag — no snap, maintain click offset
+        imgDragRef.current = {
+          mode: 'drag', isLoose, sysId, imgId,
+          startMouseX: e.clientX, startMouseY: e.clientY,
+          startImgX: imgData.x, startImgY: imgData.y,
+        };
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+    }
+
     const rh = e.target.closest('.resize-handle');
     if (rh) {
-      const node = rh.closest('.canvas-node');
+      const node = rh.closest('.resizable-node') || rh.closest('.canvas-node') || rh.closest('.system-box');
+      if (!node) { e.preventDefault(); return; }
       resizeRef.current = {
         el: node,
         dir: rh.dataset.resize,
@@ -165,6 +232,7 @@ export default function CanvasViewport({
         startH: node.offsetHeight,
         frameId: node.dataset.frameId || null,
         sysId: node.dataset.sysId || null,
+        isSubNode: !node.classList.contains('canvas-node'),
       };
       e.preventDefault();
       e.stopPropagation();
@@ -181,11 +249,40 @@ export default function CanvasViewport({
 
   const handleMouseMove = useCallback((e) => {
     if (isPanning()) { movePan(e.clientX, e.clientY); return; }
+
+    // Image interactions
+    if (imgDragRef.current) {
+      const ref = imgDragRef.current;
+      const wrap = document.querySelector('[data-img-id="' + ref.imgId + '"]');
+      if (!wrap) { imgDragRef.current = null; return; }
+      if (ref.mode === 'drag') {
+        const dx = (e.clientX - ref.startMouseX) / mapZoom;
+        const dy = (e.clientY - ref.startMouseY) / mapZoom;
+        const newX = ref.startImgX + dx;
+        const newY = ref.startImgY + dy;
+        wrap.style.left = newX + 'px';
+        wrap.style.top = newY + 'px';
+        ref._curX = newX;
+        ref._curY = newY;
+      } else if (ref.mode === 'resize') {
+        const dx = (e.clientX - ref.startX) / mapZoom;
+        const ratio = ref.startH / ref.startW;
+        const newW = Math.max(30, ref.startW + dx);
+        const newH = newW * ratio;
+        wrap.style.width = newW + 'px';
+        wrap.style.height = newH + 'px';
+        ref._curW = newW;
+        ref._curH = newH;
+      }
+      return;
+    }
+
     if (resizeRef.current) {
       const rs = resizeRef.current;
       const dx = (e.clientX - rs.startX) / mapZoom;
       const dy = (e.clientY - rs.startY) / mapZoom;
-      if (rs.dir.indexOf('r') > -1) rs.el.style.width = Math.max(200, rs.startW + dx) + 'px';
+      const minW = rs.isSubNode ? 120 : 200;
+      if (rs.dir.indexOf('r') > -1) rs.el.style.width = Math.max(minW, rs.startW + dx) + 'px';
       if (rs.dir.indexOf('b') > -1) rs.el.style.height = Math.max(100, rs.startH + dy) + 'px';
       return;
     }
@@ -195,16 +292,40 @@ export default function CanvasViewport({
   const handleMouseUp = useCallback((e) => {
     if (e.button === 1) { endPan(1); return; }
     if (e.button === 0) endPan(0);
+
+    // Persist image interactions
+    if (imgDragRef.current) {
+      const ref = imgDragRef.current;
+      const updateFn = ref.isLoose ? onUpdateLooseImage : onUpdateImage;
+      if (ref.mode === 'drag' && ref._curX !== undefined) {
+        if (ref.isLoose) {
+          updateFn(ref.imgId, { x: ref._curX, y: ref._curY });
+        } else {
+          updateFn(ref.sysId, ref.imgId, { x: ref._curX, y: ref._curY });
+        }
+      } else if (ref.mode === 'resize' && ref._curW !== undefined) {
+        if (ref.isLoose) {
+          updateFn(ref.imgId, { w: ref._curW, h: ref._curH });
+        } else {
+          updateFn(ref.sysId, ref.imgId, { w: ref._curW, h: ref._curH });
+        }
+      }
+      imgDragRef.current = null;
+      return;
+    }
+
     if (resizeRef.current) {
       const rs = resizeRef.current;
       const newW = parseFloat(rs.el.style.width);
+      const newH = parseFloat(rs.el.style.height);
       if (rs.frameId && onResizeFrame) onResizeFrame(rs.frameId, newW);
-      if (rs.sysId && rs.el.closest('.loose-system') && onResizeLooseSystem) onResizeLooseSystem(rs.sysId, newW);
+      else if (rs.sysId && rs.el.closest('.loose-system') && onResizeLooseSystem) onResizeLooseSystem(rs.sysId, newW);
+      else if (rs.sysId && rs.isSubNode && onResizeSubNode) onResizeSubNode(rs.sysId, newW, newH);
       resizeRef.current = null;
       return;
     }
     if (vpRef.current) dragMouseUp(e, vpRef.current.getBoundingClientRect());
-  }, [endPan, dragMouseUp, onResizeFrame, onResizeLooseSystem]);
+  }, [endPan, dragMouseUp, onResizeFrame, onResizeLooseSystem, onResizeSubNode, onUpdateImage, onUpdateLooseImage]);
 
   const handleWheel_ = useCallback((e) => {
     e.preventDefault();
@@ -217,6 +338,28 @@ export default function CanvasViewport({
 
     const rect = vpRef.current.getBoundingClientRect();
     const cp = screenToCanvas(e.clientX, e.clientY, rect);
+
+    // Image (loose or system-parented)
+    const imgEl = e.target.closest('.planner-img-wrap');
+    if (imgEl) {
+      const imgId = imgEl.dataset.imgId;
+      const isLoose = !!imgEl.dataset.imgLoose;
+      if (isLoose) {
+        const imgData = (milestone.looseImages || []).find((i) => i.id === imgId);
+        if (imgData) {
+          showContextMenu({ screenX: e.clientX, screenY: e.clientY, canvasX: cp.x, canvasY: cp.y, type: 'image', targetId: imgId, targetData: { ...imgData, isLoose: true } });
+          return;
+        }
+      } else {
+        const sysId = imgEl.dataset.imgSys;
+        const sys = findTask(sysId, milestone);
+        const imgData = sys && sys.images ? sys.images.find((i) => i.id === imgId) : null;
+        if (imgData) {
+          showContextMenu({ screenX: e.clientX, screenY: e.clientY, canvasX: cp.x, canvasY: cp.y, type: 'image', targetId: imgId, targetData: { ...imgData, sysId } });
+          return;
+        }
+      }
+    }
 
     // Task
     const taskEl = e.target.closest('.task-item') || e.target.closest('.loose-task');
@@ -273,6 +416,35 @@ export default function CanvasViewport({
     if (onDeleteArrow) onDeleteArrow(arrowId);
   }, [onDeleteArrow]);
 
+  // sysId: string = add to system; null = add as loose image at (canvasX, canvasY)
+  const handleAddImage = useCallback((sysId, canvasX, canvasY) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async (ev) => {
+      const file = ev.target.files[0];
+      if (!file) return;
+      try {
+        const { uploadPlannerImage } = await import('../helpers/imageUpload');
+        const { url, width, height } = await uploadPlannerImage(file);
+        // Scale to fit max 200px on longest side, preserve aspect ratio
+        let w = width, h = height;
+        if (w > 200 || h > 200) {
+          if (w >= h) { h = Math.round((h / w) * 200); w = 200; }
+          else { w = Math.round((w / h) * 200); h = 200; }
+        }
+        if (sysId) {
+          onAddImage(sysId, { url, w, h });
+        } else {
+          onAddLooseImage({ url, w, h, x: canvasX || 100, y: canvasY || 100 });
+        }
+      } catch (err) {
+        console.error('Image upload failed:', err);
+      }
+    };
+    input.click();
+  }, [onAddImage, onAddLooseImage]);
+
   return (
     <div
       className={`map-viewport${hidden ? ' hidden' : ''}${arrowMode ? ' arrow-mode' : ''}`}
@@ -304,6 +476,9 @@ export default function CanvasViewport({
         {(milestone.looseTasks || []).map((task) => (
           <LooseTask key={task.id} task={task} />
         ))}
+        {(milestone.looseImages || []).map((img) => (
+          <LooseImage key={img.id} image={img} />
+        ))}
       </div>
 
       {/* Arrow mode indicator */}
@@ -326,6 +501,7 @@ export default function CanvasViewport({
         <ContextMenu
           x={contextMenu.x} y={contextMenu.y}
           type={contextMenu.type} targetId={contextMenu.targetId} targetData={contextMenu.targetData}
+          canvasX={contextMenu.canvasX} canvasY={contextMenu.canvasY}
           onNewTask={() => onCreateTask(contextMenu.canvasX, contextMenu.canvasY)}
           onNewSystem={() => onCreateSystem(contextMenu.canvasX, contextMenu.canvasY)}
           onNewFrame={() => onCreateFrame(contextMenu.canvasX, contextMenu.canvasY)}
@@ -337,6 +513,13 @@ export default function CanvasViewport({
           onDeleteSystem={onDeleteSystem}
           onDeleteFrame={onDeleteFrame}
           onStartArrow={handleStartArrow}
+          onAddImage={handleAddImage}
+          onUpdateImage={onUpdateImage}
+          onUpdateLooseImage={onUpdateLooseImage}
+          onDeleteImage={onDeleteImage}
+          onDeleteLooseImage={onDeleteLooseImage}
+          onMoveImageLayer={onMoveImageLayer}
+          onDetachImage={onDetachImage}
           onClose={closeContextMenu}
         />
       )}

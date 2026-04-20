@@ -20,7 +20,7 @@ export default function CanvasFrame({ frame }) {
       </div>
       <div className="frame-body">
         {frame.systems.map((sys) => (
-          <SystemBox key={sys.id} system={sys} />
+          <SystemBox key={sys.id} system={sys} resizable />
         ))}
       </div>
       {/* frame.note removed */}

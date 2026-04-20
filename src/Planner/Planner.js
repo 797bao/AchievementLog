@@ -189,6 +189,15 @@ function PlannerInner({ initialData, onSave }) {
           onAddArrow={state.addArrow}
           onDeleteArrow={state.deleteArrow}
           onOpenModal={handleOpenModal}
+          onResizeSubNode={state.resizeSubNode}
+          onAddImage={state.addImageToSystem}
+          onAddLooseImage={state.addLooseImage}
+          onUpdateImage={state.updateImage}
+          onUpdateLooseImage={state.updateLooseImage}
+          onDeleteImage={state.deleteImage}
+          onDeleteLooseImage={state.deleteLooseImage}
+          onMoveImageLayer={state.moveImageLayer}
+          onDetachImage={state.detachImageFromSystem}
         />
 
         {!state.isMetricsView && (

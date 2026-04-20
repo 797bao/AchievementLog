@@ -583,6 +583,129 @@ export default function usePlannerState(initialData) {
     setTaskOrder((prev) => ({ ...prev, [orderKey]: newOrder }));
   }, []);
 
+  /* ─── Sub-node resize ─── */
+  const resizeSubNode = useCallback((sysId, newWidth, newHeight) => {
+    updateMilestones((ms) => {
+      const node = findTask(sysId, ms[activeMilestoneIdx]);
+      if (node) {
+        if (newWidth && !isNaN(newWidth)) node.w = newWidth;
+        if (newHeight && !isNaN(newHeight)) node.h = newHeight;
+      }
+    });
+  }, [activeMilestoneIdx, updateMilestones]);
+
+  /* ─── Image actions ─── */
+  const addImageToSystem = useCallback((sysId, imageData) => {
+    updateMilestones((ms) => {
+      const sys = findTask(sysId, ms[activeMilestoneIdx]);
+      if (!sys) return;
+      if (!sys.images) sys.images = [];
+      sys.images.push({
+        id: 'img-' + Date.now(),
+        url: imageData.url,
+        x: imageData.x || 10,
+        y: imageData.y || 40,
+        w: imageData.w || 150,
+        h: imageData.h || 150,
+        zIndex: 0,
+        flipH: false,
+        flipV: false,
+      });
+    });
+  }, [activeMilestoneIdx, updateMilestones]);
+
+  const addLooseImage = useCallback((imageData) => {
+    updateMilestones((ms) => {
+      const milestone = ms[activeMilestoneIdx];
+      if (!milestone.looseImages) milestone.looseImages = [];
+      milestone.looseImages.push({
+        id: 'img-' + Date.now(),
+        url: imageData.url,
+        x: imageData.x || 100,
+        y: imageData.y || 100,
+        w: imageData.w || 150,
+        h: imageData.h || 150,
+        zIndex: 0,
+        flipH: false,
+        flipV: false,
+      });
+    });
+  }, [activeMilestoneIdx, updateMilestones]);
+
+  const updateLooseImage = useCallback((imgId, updates) => {
+    updateMilestones((ms) => {
+      const milestone = ms[activeMilestoneIdx];
+      if (!milestone.looseImages) return;
+      const img = milestone.looseImages.find((i) => i.id === imgId);
+      if (!img) return;
+      Object.keys(updates).forEach((k) => { img[k] = updates[k]; });
+    });
+  }, [activeMilestoneIdx, updateMilestones]);
+
+  const deleteLooseImage = useCallback((imgId) => {
+    updateMilestones((ms) => {
+      const milestone = ms[activeMilestoneIdx];
+      if (!milestone.looseImages) return;
+      milestone.looseImages = milestone.looseImages.filter((i) => i.id !== imgId);
+    });
+  }, [activeMilestoneIdx, updateMilestones]);
+
+  const detachImageFromSystem = useCallback((sysId, imgId, canvasX, canvasY) => {
+    updateMilestones((ms) => {
+      const milestone = ms[activeMilestoneIdx];
+      const sys = findTask(sysId, milestone);
+      if (!sys || !sys.images) return;
+      const img = sys.images.find((i) => i.id === imgId);
+      if (!img) return;
+      // Remove from system
+      sys.images = sys.images.filter((i) => i.id !== imgId);
+      // Add as loose image at canvas position
+      if (!milestone.looseImages) milestone.looseImages = [];
+      milestone.looseImages.push({
+        ...img,
+        x: canvasX,
+        y: canvasY,
+      });
+    });
+  }, [activeMilestoneIdx, updateMilestones]);
+
+  const updateImage = useCallback((sysId, imgId, updates) => {
+    updateMilestones((ms) => {
+      const sys = findTask(sysId, ms[activeMilestoneIdx]);
+      if (!sys || !sys.images) return;
+      const img = sys.images.find((i) => i.id === imgId);
+      if (!img) return;
+      Object.keys(updates).forEach((k) => { img[k] = updates[k]; });
+    });
+  }, [activeMilestoneIdx, updateMilestones]);
+
+  const deleteImage = useCallback((sysId, imgId) => {
+    updateMilestones((ms) => {
+      const sys = findTask(sysId, ms[activeMilestoneIdx]);
+      if (!sys || !sys.images) return;
+      sys.images = sys.images.filter((i) => i.id !== imgId);
+    });
+  }, [activeMilestoneIdx, updateMilestones]);
+
+  const moveImageLayer = useCallback((sysId, imgId, direction) => {
+    updateMilestones((ms) => {
+      const sys = findTask(sysId, ms[activeMilestoneIdx]);
+      if (!sys || !sys.images || sys.images.length < 2) return;
+      // Sort by zIndex, find position, swap
+      const sorted = [...sys.images].sort((a, b) => a.zIndex - b.zIndex);
+      const idx = sorted.findIndex((i) => i.id === imgId);
+      if (idx < 0) return;
+      const newIdx = idx + direction;
+      if (newIdx < 0 || newIdx >= sorted.length) return;
+      // Swap zIndex values
+      const tmpZ = sorted[idx].zIndex;
+      const realA = sys.images.find((i) => i.id === sorted[idx].id);
+      const realB = sys.images.find((i) => i.id === sorted[newIdx].id);
+      realA.zIndex = sorted[newIdx].zIndex;
+      realB.zIndex = tmpZ;
+    });
+  }, [activeMilestoneIdx, updateMilestones]);
+
   /* ─── Ensure layout ─── */
   autoLayoutMilestone(activeMilestone);
 
@@ -646,5 +769,14 @@ export default function usePlannerState(initialData) {
     assignSprint,
     unassignSprint,
     updateTaskOrder,
+    resizeSubNode,
+    addImageToSystem,
+    addLooseImage,
+    updateImage,
+    updateLooseImage,
+    deleteImage,
+    deleteLooseImage,
+    moveImageLayer,
+    detachImageFromSystem,
   };
 }
