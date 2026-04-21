@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import KanbanBoard from './KanbanBoard';
 import {
   getAllLeaves,
@@ -14,6 +14,7 @@ import {
   getTaskLoggedTime,
   monthKey,
   monthLabel,
+  wasLoggedToday,
 } from '../plannerHelpers';
 
 export default function BoardView({
@@ -34,6 +35,8 @@ export default function BoardView({
   onCreateTaskInSystem,
 }) {
   const isActive = isSprintOverview || !!currentBoardId;
+  // "Today Only" filter state (sprint view only)
+  const [todayOnly, setTodayOnly] = useState(false);
 
   // Sprint overview spans ALL milestones — sprint is a global, time-based concept
   const sprintData = useMemo(() => {
@@ -41,7 +44,16 @@ export default function BoardView({
     const sourceMilestones = milestones || [milestone];
     let allLeaves = [];
     sourceMilestones.forEach((m) => { allLeaves = allLeaves.concat(getAllLeaves(m)); });
-    const filtered = allLeaves.filter((l) => l.sprint === mk);
+    let filtered = allLeaves.filter((l) => l.sprint === mk);
+
+    if (todayOnly) {
+      // Hide completed; keep only tasks that were touched today (a time entry logged today)
+      filtered = filtered.filter((l) => {
+        if (l.status === 'done') return false;
+        return Array.isArray(l.timeLogs) && l.timeLogs.some(wasLoggedToday);
+      });
+    }
+
     const done = filtered.filter((l) => l.status === 'done').length;
     let timeEst = 0;
     let timeLogged = 0;
@@ -50,7 +62,7 @@ export default function BoardView({
       timeLogged += getTaskLoggedTime(l);
     });
     return { filtered, count: filtered.length, done, timeEst: formatTime(timeEst), timeLogged: formatTime(timeLogged) };
-  }, [isSprintOverview, milestone, milestones, mk]);
+  }, [isSprintOverview, milestone, milestones, mk, todayOnly]);
 
   const systemData = useMemo(() => {
     if (!currentBoardId) return null;
@@ -163,6 +175,13 @@ export default function BoardView({
             <button className="bm-btn" onClick={() => onChangeSidebarMonth(-1)}>&#9664;</button>
             <div className="bm-label">{monthLabel(boardMonth.year, boardMonth.month)}</div>
             <button className="bm-btn" onClick={() => onChangeSidebarMonth(1)}>&#9654;</button>
+            <button
+              className={`board-filter-btn${todayOnly ? ' active' : ''}`}
+              onClick={() => setTodayOnly((v) => !v)}
+              title="Show only tasks logged today (excludes completed)"
+            >
+              &#128197; Today Only
+            </button>
           </div>
           <KanbanBoard
             items={sprintData.filtered} showSystem={true}

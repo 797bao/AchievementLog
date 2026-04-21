@@ -956,6 +956,31 @@
   color: #e8eaed;
 }
 
+.board-filter-btn {
+  margin-left: auto;
+  background: none;
+  border: 1px solid #3c3f47;
+  color: #9aa0a6;
+  border-radius: 4px;
+  padding: 4px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.board-filter-btn:hover {
+  border-color: #E8985A;
+  color: #e8eaed;
+}
+
+.board-filter-btn.active {
+  border-color: #E8985A;
+  background: rgba(232, 152, 90, 0.18);
+  color: #E8985A;
+}
+
 .bm-label {
   font-size: 13px;
   font-weight: 600;

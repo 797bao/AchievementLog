@@ -251,7 +251,15 @@ function TimeLogsEditor({ logs, onChange }) {
   }, [logs.length]);
 
   const addLog = () => {
-    onChange([...logs, { id: 'tl-' + Date.now(), duration: '', month: defaultMonth }]);
+    onChange([
+      ...logs,
+      {
+        id: 'tl-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+        duration: '',
+        month: defaultMonth,
+        loggedAt: new Date().toISOString(),
+      },
+    ]);
   };
 
   const updateLog = (idx, field, val) => {

@@ -19,6 +19,31 @@ export function sprintShort(key) {
   return MONTH_NAMES[parseInt(p[1])];
 }
 
+/**
+ * True when the given time-log entry was created today (local time).
+ * Prefers an explicit `loggedAt` ISO string; falls back to parsing the
+ * timestamp embedded in the entry's `id` (format: `tl-<ms>-…`).
+ */
+export function wasLoggedToday(log) {
+  if (!log) return false;
+  let ts = null;
+  if (log.loggedAt) {
+    const parsed = Date.parse(log.loggedAt);
+    if (!isNaN(parsed)) ts = parsed;
+  }
+  if (ts == null && typeof log.id === 'string' && log.id.startsWith('tl-')) {
+    const parts = log.id.split('-');
+    const n = parseInt(parts[1], 10);
+    if (!isNaN(n) && n > 0) ts = n;
+  }
+  if (ts == null) return false;
+  const d = new Date(ts);
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear()
+      && d.getMonth() === now.getMonth()
+      && d.getDate() === now.getDate();
+}
+
 /* ─── Tree traversal ─── */
 export function getLeaves(node) {
   if (!node.children) return [node]; // leaf task

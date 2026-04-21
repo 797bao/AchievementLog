@@ -470,6 +470,7 @@ export default function usePlannerState(initialData) {
         id: 'tl-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
         duration: duration.trim(),
         month: month || monthKey(boardMonth.year, boardMonth.month),
+        loggedAt: new Date().toISOString(),
       });
     });
   }, [activeMilestoneIdx, boardMonth, updateMilestones]);
