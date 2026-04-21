@@ -291,8 +291,11 @@ export function deepCloneWithNewIds(element) {
   let counter = 0;
   const ts = Date.now();
 
+  // Random suffix guarantees uniqueness across multiple deepClone calls in the
+  // same millisecond (e.g. when pasteElements clones each item separately).
+  const rand = Math.random().toString(36).slice(2, 8);
   function newId(prefix) {
-    return prefix + '-' + ts + '-' + (counter++);
+    return prefix + '-' + ts + '-' + rand + '-' + (counter++);
   }
 
   function cloneNode(node) {

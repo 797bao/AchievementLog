@@ -70,6 +70,16 @@ export default function CanvasViewport({
   const selectionRef = useRef(selection);
   selectionRef.current = selection;
 
+  // Clear stale selection when switching to a different milestone — old IDs
+  // referenced items that no longer exist on this canvas, which broke drag math.
+  const lastMilestoneIdRef = useRef(milestone.id);
+  useEffect(() => {
+    if (lastMilestoneIdRef.current !== milestone.id) {
+      clearSelection();
+      lastMilestoneIdRef.current = milestone.id;
+    }
+  }, [milestone.id, clearSelection]);
+
   // Right-click drag selection box
   const rightDragRef = useRef(null);
   const suppressContextMenuRef = useRef(false);
@@ -218,7 +228,11 @@ export default function CanvasViewport({
 
     // Pass raw clipboard data — pasteElements in usePlannerState handles cloning + new IDs
     onPasteElements(clip, { x: canvasX || 0, y: canvasY || 0 });
-  }, [onPasteElements]);
+    // Drop the stale selection from the copy source so newly pasted items can
+    // be dragged individually (their IDs aren't in the old selection anyway,
+    // but this also avoids any leftover multi-drag intent on identical IDs).
+    clearSelection();
+  }, [onPasteElements, clearSelection]);
 
   // ─── Compute elements inside a screen-space selection box ───
   const computeSelectionFromBox = useCallback((box) => {
