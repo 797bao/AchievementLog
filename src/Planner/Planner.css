@@ -956,8 +956,25 @@
   color: #e8eaed;
 }
 
-.board-filter-btn {
+.board-filter-group {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.board-filter-row {
+  display: flex;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #3c3f47;
+}
+
+.board-filter-row .board-filter-group {
+  margin-left: auto;
+}
+
+.board-filter-btn {
   background: none;
   border: 1px solid #3c3f47;
   color: #9aa0a6;
@@ -979,6 +996,16 @@
   border-color: #E8985A;
   background: rgba(232, 152, 90, 0.18);
   color: #E8985A;
+}
+
+.board-filter-today-total {
+  font-size: 12px;
+  color: #9aa0a6;
+}
+
+.board-filter-today-total .val {
+  color: #E8985A;
+  font-weight: 700;
 }
 
 .bm-label {
@@ -2036,6 +2063,23 @@
   min-width: 70px;
   text-align: center;
   font-weight: 500;
+}
+
+.tl-date {
+  color-scheme: dark;
+  background: #23262e;
+  border: 1px solid #3c3f47;
+  color: #e8eaed;
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 11px;
+  font-family: inherit;
+  margin-left: 4px;
+}
+
+.tl-date:focus {
+  outline: none;
+  border-color: #E8985A;
 }
 
 .tl-remove {

@@ -15,6 +15,8 @@ import {
   monthKey,
   monthLabel,
   wasLoggedToday,
+  passesTodayFilter,
+  sumTodayMinutes,
 } from '../plannerHelpers';
 
 export default function BoardView({
@@ -44,15 +46,8 @@ export default function BoardView({
     const sourceMilestones = milestones || [milestone];
     let allLeaves = [];
     sourceMilestones.forEach((m) => { allLeaves = allLeaves.concat(getAllLeaves(m)); });
-    let filtered = allLeaves.filter((l) => l.sprint === mk);
-
-    if (todayOnly) {
-      // Hide completed; keep only tasks that were touched today (a time entry logged today)
-      filtered = filtered.filter((l) => {
-        if (l.status === 'done') return false;
-        return Array.isArray(l.timeLogs) && l.timeLogs.some(wasLoggedToday);
-      });
-    }
+    const sprintLeaves = allLeaves.filter((l) => l.sprint === mk);
+    const filtered = todayOnly ? sprintLeaves.filter(passesTodayFilter) : sprintLeaves;
 
     const done = filtered.filter((l) => l.status === 'done').length;
     let timeEst = 0;
@@ -61,7 +56,15 @@ export default function BoardView({
       timeEst += getTaskExpectedTime(l);
       timeLogged += getTaskLoggedTime(l);
     });
-    return { filtered, count: filtered.length, done, timeEst: formatTime(timeEst), timeLogged: formatTime(timeLogged) };
+    const todayMins = sumTodayMinutes(sprintLeaves);
+    return {
+      filtered,
+      count: filtered.length,
+      done,
+      timeEst: formatTime(timeEst),
+      timeLogged: formatTime(timeLogged),
+      todayMins,
+    };
   }, [isSprintOverview, milestone, milestones, mk, todayOnly]);
 
   const systemData = useMemo(() => {
@@ -70,29 +73,36 @@ export default function BoardView({
     // Try as system/node first
     const node = findTask(currentBoardId, milestone);
     if (node) {
-      const allLeaves = getLeaves(node);
-      const prog = getProgress(node);
-      const expectedT = getTotalTime(node);
-      const loggedT = getLoggedTime(node);
-      return { node, allLeaves, prog, expectedT: formatTime(expectedT), loggedT: formatTime(loggedT), rawExpected: expectedT, rawLogged: loggedT, isFrame: false };
-    }
-
-    // Try as frame
-    const frame = milestone.frames.find((f) => f.id === currentBoardId);
-    if (frame) {
-      let allLeaves = [];
-      frame.systems.forEach((sys) => { allLeaves = allLeaves.concat(getLeaves(sys)); });
-      (frame.tasks || []).forEach((t) => allLeaves.push(t));
+      const rawLeaves = getLeaves(node);
+      const allLeaves = todayOnly ? rawLeaves.filter(passesTodayFilter) : rawLeaves;
+      // Recompute progress/time from the visible set so the header reflects the filter
       const done = allLeaves.filter((l) => l.status === 'done').length;
       const total = allLeaves.length;
       const pct = total > 0 ? Math.round((done / total) * 100) : 0;
       let expectedT = 0, loggedT = 0;
       allLeaves.forEach((l) => { expectedT += getTaskExpectedTime(l); loggedT += getTaskLoggedTime(l); });
-      return { node: null, frame, allLeaves, prog: { done, total, pct }, expectedT: formatTime(expectedT), loggedT: formatTime(loggedT), rawExpected: expectedT, rawLogged: loggedT, isFrame: true };
+      const todayMins = sumTodayMinutes(rawLeaves);
+      return { node, allLeaves, prog: { done, total, pct }, expectedT: formatTime(expectedT), loggedT: formatTime(loggedT), rawExpected: expectedT, rawLogged: loggedT, isFrame: false, todayMins };
+    }
+
+    // Try as frame
+    const frame = milestone.frames.find((f) => f.id === currentBoardId);
+    if (frame) {
+      let rawLeaves = [];
+      frame.systems.forEach((sys) => { rawLeaves = rawLeaves.concat(getLeaves(sys)); });
+      (frame.tasks || []).forEach((t) => rawLeaves.push(t));
+      const allLeaves = todayOnly ? rawLeaves.filter(passesTodayFilter) : rawLeaves;
+      const done = allLeaves.filter((l) => l.status === 'done').length;
+      const total = allLeaves.length;
+      const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+      let expectedT = 0, loggedT = 0;
+      allLeaves.forEach((l) => { expectedT += getTaskExpectedTime(l); loggedT += getTaskLoggedTime(l); });
+      const todayMins = sumTodayMinutes(rawLeaves);
+      return { node: null, frame, allLeaves, prog: { done, total, pct }, expectedT: formatTime(expectedT), loggedT: formatTime(loggedT), rawExpected: expectedT, rawLogged: loggedT, isFrame: true, todayMins };
     }
 
     return null;
-  }, [currentBoardId, milestone]);
+  }, [currentBoardId, milestone, todayOnly]);
 
   const boardKey = isSprintOverview
     ? `sprint_all_${mk}`
@@ -175,13 +185,18 @@ export default function BoardView({
             <button className="bm-btn" onClick={() => onChangeSidebarMonth(-1)}>&#9664;</button>
             <div className="bm-label">{monthLabel(boardMonth.year, boardMonth.month)}</div>
             <button className="bm-btn" onClick={() => onChangeSidebarMonth(1)}>&#9654;</button>
-            <button
-              className={`board-filter-btn${todayOnly ? ' active' : ''}`}
-              onClick={() => setTodayOnly((v) => !v)}
-              title="Show only tasks logged today (excludes completed)"
-            >
-              &#128197; Today Only
-            </button>
+            <div className="board-filter-group">
+              <button
+                className={`board-filter-btn${todayOnly ? ' active' : ''}`}
+                onClick={() => setTodayOnly((v) => !v)}
+                title="Show only tasks with a log entry from today (+ unstarted tasks)"
+              >
+                &#128197; Today Only
+              </button>
+              <span className="board-filter-today-total" title="Total time logged today for this view">
+                Today: <span className="val">{formatTime(sprintData.todayMins)}</span>
+              </span>
+            </div>
           </div>
           <KanbanBoard
             items={sprintData.filtered} showSystem={true}
@@ -206,6 +221,20 @@ export default function BoardView({
             <span className="val">{systemData.prog.done}/{systemData.prog.total}</span> tasks &middot;{' '}
             <span className="val">{systemData.prog.pct}%</span> &middot;{' '}
             <span className={`val${systemData.rawLogged > systemData.rawExpected && systemData.rawExpected > 0 ? ' time-over' : ''}`}>{systemData.loggedT}</span>/{systemData.expectedT}
+          </div>
+          <div className="board-filter-row">
+            <div className="board-filter-group">
+              <button
+                className={`board-filter-btn${todayOnly ? ' active' : ''}`}
+                onClick={() => setTodayOnly((v) => !v)}
+                title="Show only tasks with a log entry from today (+ unstarted tasks)"
+              >
+                &#128197; Today Only
+              </button>
+              <span className="board-filter-today-total" title="Total time logged today for this view">
+                Today: <span className="val">{formatTime(systemData.todayMins)}</span>
+              </span>
+            </div>
           </div>
           <KanbanBoard
             items={systemData.allLeaves} showSystem={!!systemData.isFrame}

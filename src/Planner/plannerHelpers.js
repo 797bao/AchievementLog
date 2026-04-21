@@ -44,6 +44,31 @@ export function wasLoggedToday(log) {
       && d.getDate() === now.getDate();
 }
 
+/**
+ * "Today Only" visibility rule for a leaf task:
+ *   • has a log dated today                → visible
+ *   • has logs but none today              → hidden (logged a different day)
+ *   • no logs at all, status 'done'        → hidden
+ *   • no logs at all, status not 'done'    → visible (not started yet)
+ */
+export function passesTodayFilter(leaf) {
+  const logs = (leaf && leaf.timeLogs) || [];
+  if (logs.some(wasLoggedToday)) return true;
+  if (logs.length > 0) return false;
+  return leaf && leaf.status !== 'done';
+}
+
+/** Sum (in minutes) of all time-log entries in `leaves` that were logged today. */
+export function sumTodayMinutes(leaves) {
+  let total = 0;
+  (leaves || []).forEach((l) => {
+    (l.timeLogs || []).forEach((log) => {
+      if (wasLoggedToday(log)) total += parseTime(log.duration);
+    });
+  });
+  return total;
+}
+
 /* ─── Tree traversal ─── */
 export function getLeaves(node) {
   if (!node.children) return [node]; // leaf task

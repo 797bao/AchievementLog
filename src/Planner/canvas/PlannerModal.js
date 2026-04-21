@@ -287,6 +287,37 @@ function TimeLogsEditor({ logs, onChange }) {
     updateLog(idx, 'month', y + '-' + m);
   };
 
+  // loggedAt <-> date-input (YYYY-MM-DD) conversions, using LOCAL time so the
+  // "today" filter agrees with the user's wall clock.
+  const dateInputValue = (log) => {
+    // Prefer loggedAt; fall back to the timestamp embedded in the id
+    let ts = null;
+    if (log.loggedAt) {
+      const parsed = Date.parse(log.loggedAt);
+      if (!isNaN(parsed)) ts = parsed;
+    }
+    if (ts == null && typeof log.id === 'string' && log.id.startsWith('tl-')) {
+      const parts = log.id.split('-');
+      const n = parseInt(parts[1], 10);
+      if (!isNaN(n) && n > 0) ts = n;
+    }
+    if (ts == null) return '';
+    const d = new Date(ts);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const setLoggedDate = (idx, dateStr) => {
+    // dateStr is 'YYYY-MM-DD' from the <input type="date">
+    if (!dateStr) { updateLog(idx, 'loggedAt', null); return; }
+    const [y, m, d] = dateStr.split('-').map((n) => parseInt(n, 10));
+    // Anchor at noon local time to avoid DST/TZ edge cases shifting the date
+    const dt = new Date(y, (m || 1) - 1, d || 1, 12, 0, 0);
+    updateLog(idx, 'loggedAt', dt.toISOString());
+  };
+
   return (
     <div className="tl-editor">
       {logs.map((log, idx) => (
@@ -303,6 +334,13 @@ function TimeLogsEditor({ logs, onChange }) {
           <button type="button" className="tl-month-btn" onClick={() => cycleMonth(idx, -1)}>&#9664;</button>
           <span className="tl-month-label">{monthDisplay(log.month)}</span>
           <button type="button" className="tl-month-btn" onClick={() => cycleMonth(idx, 1)}>&#9654;</button>
+          <input
+            type="date"
+            className="tl-date"
+            value={dateInputValue(log)}
+            onChange={(e) => setLoggedDate(idx, e.target.value)}
+            title="Date this entry was logged (used by the Today Only filter)"
+          />
           <button type="button" className="tl-remove" onClick={() => removeLog(idx)} title="Remove">&#10005;</button>
         </div>
       ))}
