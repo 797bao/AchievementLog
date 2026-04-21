@@ -8,7 +8,7 @@ import MetricsView from './MetricsView';
 import PlannerModal from './canvas/PlannerModal';
 import usePlannerState from './hooks/usePlannerState';
 import usePlannerFirebase from './hooks/usePlannerFirebase';
-import { findTask } from './plannerHelpers';
+import { findTask, monthKey } from './plannerHelpers';
 
 /* ─── Outer shell: handles Firebase loading ─── */
 export default function Planner({ isOwner }) {
@@ -78,6 +78,32 @@ function PlannerInner({ initialData, onSave }) {
     setModal(modalData);
   }, []);
 
+  /** Wrapper around updateTaskStatus that prompts to log a time entry
+   *  whenever a task transitions INTO the "done" state. */
+  const handleUpdateTaskStatus = useCallback((taskId, newStatus) => {
+    // Look up the task across all milestones to see if this is a fresh transition
+    let wasAlreadyDone = false;
+    for (const m of state.milestones) {
+      const t = findTask(taskId, m);
+      if (t) { wasAlreadyDone = t.status === 'done'; break; }
+    }
+
+    state.updateTaskStatus(taskId, newStatus);
+
+    if (newStatus === 'done' && !wasAlreadyDone) {
+      const currentMonth = monthKey(state.boardMonth.year, state.boardMonth.month);
+      setModal({
+        type: 'log-time-on-done',
+        targetId: taskId,
+        title: 'Task complete — log time?',
+        fields: [
+          { key: 'duration', label: 'Time Spent', type: 'text', value: '', placeholder: 'e.g. 2h, 30m (leave blank to skip)' },
+          { key: 'month', label: 'Month', type: 'sprint-select', value: currentMonth },
+        ],
+      });
+    }
+  }, [state]);
+
   const handleModalSubmit = useCallback((values) => {
     if (!modal) return;
 
@@ -95,6 +121,12 @@ function PlannerInner({ initialData, onSave }) {
       if (values.name) state.renameMilestone(modal.targetId, values.name);
     } else if (modal.type === 'confirm-delete-milestone') {
       state.deleteMilestone(modal.targetId);
+    } else if (modal.type === 'log-time-on-done') {
+      // Task was already marked done before this modal opened — just append
+      // the optional time log. Empty duration is a no-op (effectively "skip").
+      if (values.duration && values.duration.trim()) {
+        state.addTimeLog(modal.targetId, values.duration, values.month || null);
+      }
     }
 
     setModal(null);
@@ -178,7 +210,7 @@ function PlannerInner({ initialData, onSave }) {
           onRenameTask={state.renameTask}
           onChangeTaskIcon={state.changeTaskIcon}
           onSetTaskTime={state.setTaskTime}
-          onUpdateTaskStatus={state.updateTaskStatus}
+          onUpdateTaskStatus={handleUpdateTaskStatus}
           onUpdateTask={state.updateTask}
           onDeleteTask={state.deleteTask}
           onDeleteSystem={state.deleteSystem}
@@ -217,7 +249,7 @@ function PlannerInner({ initialData, onSave }) {
             taskOrder={state.taskOrder}
             onCloseBoard={state.closeBoard}
             onChangeSidebarMonth={state.changeSidebarMonth}
-            onStatusChange={state.updateTaskStatus}
+            onStatusChange={handleUpdateTaskStatus}
             onUpdateTaskOrder={state.updateTaskOrder}
             onOpenModal={handleOpenModal}
             onDeleteTask={state.deleteTask}

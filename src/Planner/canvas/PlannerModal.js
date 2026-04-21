@@ -238,6 +238,18 @@ function TimeLogsEditor({ logs, onChange }) {
   const now = new Date();
   const defaultMonth = now.getFullYear() + '-' + now.getMonth();
 
+  // Auto-focus the newest duration input when "+ Add Time Entry" appends a row
+  const prevLenRef = useRef(logs.length);
+  const lastDurationRef = useRef(null);
+
+  useEffect(() => {
+    if (logs.length > prevLenRef.current && lastDurationRef.current) {
+      lastDurationRef.current.focus();
+      lastDurationRef.current.select();
+    }
+    prevLenRef.current = logs.length;
+  }, [logs.length]);
+
   const addLog = () => {
     onChange([...logs, { id: 'tl-' + Date.now(), duration: '', month: defaultMonth }]);
   };
@@ -272,6 +284,7 @@ function TimeLogsEditor({ logs, onChange }) {
       {logs.map((log, idx) => (
         <div className="tl-row" key={log.id || idx}>
           <input
+            ref={idx === logs.length - 1 ? lastDurationRef : null}
             className="tl-duration"
             type="text"
             value={log.duration}

@@ -459,6 +459,21 @@ export default function usePlannerState(initialData) {
     });
   }, [activeMilestoneIdx, boardMonth, updateMilestones]);
 
+  /** Append a single time-log entry to a task (used by the "log time on done" modal). */
+  const addTimeLog = useCallback((taskId, duration, month) => {
+    if (!duration || !duration.trim()) return;
+    updateMilestones((ms) => {
+      const task = findTaskAnywhere(taskId, ms);
+      if (!task) return;
+      if (!task.timeLogs) task.timeLogs = [];
+      task.timeLogs.push({
+        id: 'tl-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+        duration: duration.trim(),
+        month: month || monthKey(boardMonth.year, boardMonth.month),
+      });
+    });
+  }, [activeMilestoneIdx, boardMonth, updateMilestones]);
+
   /** Update multiple task fields at once (used by modal) */
   const updateTask = useCallback((taskId, updates) => {
     updateMilestones((ms) => {
@@ -1036,6 +1051,7 @@ export default function usePlannerState(initialData) {
     changeTaskIcon,
     setTaskTime,
     updateTaskStatus,
+    addTimeLog,
     updateTask,
     deleteTask,
     deleteSystem,
