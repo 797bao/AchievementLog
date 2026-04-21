@@ -47,20 +47,27 @@ export default function usePlannerState(initialData) {
     [activeMilestone]
   );
 
+  // Cross-milestone leaves for sprint views (sprint is a global concept across milestones)
+  const allLeavesAllMilestones = useMemo(() => {
+    let all = [];
+    milestones.forEach((m) => { all = all.concat(getAllLeaves(m)); });
+    return all;
+  }, [milestones]);
+
   const mk = monthKey(boardMonth.year, boardMonth.month);
 
   const sprintStats = useMemo(() => {
-    const assigned = allLeaves.filter((l) => l.sprint === mk).length;
-    const completed = allLeaves.filter((l) => l.completedAt === mk).length;
-    const inProgress = allLeaves.filter((l) => l.sprint === mk && l.status === 'progress').length;
+    const assigned = allLeavesAllMilestones.filter((l) => l.sprint === mk).length;
+    const completed = allLeavesAllMilestones.filter((l) => l.completedAt === mk).length;
+    const inProgress = allLeavesAllMilestones.filter((l) => l.sprint === mk && l.status === 'progress').length;
     let timeEst = 0;
     let timeLogged = 0;
-    allLeaves.filter((l) => l.sprint === mk).forEach((l) => {
+    allLeavesAllMilestones.filter((l) => l.sprint === mk).forEach((l) => {
       timeEst += getTaskExpectedTime(l);
       timeLogged += getTaskLoggedTime(l);
     });
     return { assigned, completed, inProgress, timeEst: formatTime(timeEst), timeLogged: formatTime(timeLogged) };
-  }, [allLeaves, mk]);
+  }, [allLeavesAllMilestones, mk]);
 
   const totalStats = useMemo(() => {
     const done = allLeaves.filter((l) => l.status === 'done').length;
@@ -427,9 +434,21 @@ export default function usePlannerState(initialData) {
     });
   }, [activeMilestoneIdx, updateMilestones]);
 
+  // Find a task across all milestones (active first), so cross-milestone sprint view edits work
+  const findTaskAnywhere = (taskId, ms) => {
+    let t = findTask(taskId, ms[activeMilestoneIdx]);
+    if (t) return t;
+    for (let i = 0; i < ms.length; i++) {
+      if (i === activeMilestoneIdx) continue;
+      t = findTask(taskId, ms[i]);
+      if (t) return t;
+    }
+    return null;
+  };
+
   const updateTaskStatus = useCallback((taskId, newStatus) => {
     updateMilestones((ms) => {
-      const task = findTask(taskId, ms[activeMilestoneIdx]);
+      const task = findTaskAnywhere(taskId, ms);
       if (!task || task.children) return;
       task.status = newStatus;
       if (newStatus === 'done') {
@@ -443,7 +462,7 @@ export default function usePlannerState(initialData) {
   /** Update multiple task fields at once (used by modal) */
   const updateTask = useCallback((taskId, updates) => {
     updateMilestones((ms) => {
-      const task = findTask(taskId, ms[activeMilestoneIdx]);
+      const task = findTaskAnywhere(taskId, ms);
       if (!task) return;
       if (updates.name !== undefined) task.name = updates.name;
       if (updates.type !== undefined) task.type = updates.type;
@@ -465,14 +484,20 @@ export default function usePlannerState(initialData) {
   /* ─── Delete actions ─── */
   const deleteTask = useCallback((taskId) => {
     updateMilestones((ms) => {
-      const milestone = ms[activeMilestoneIdx];
-      removeTaskFromTree(taskId, milestone);
-      // Also remove any arrows referencing this task
-      if (milestone.arrows) {
-        milestone.arrows = milestone.arrows.filter(
-          (a) => a.fromId !== taskId && a.toId !== taskId
-        );
+      // Try active milestone first, then fall back to all (sprint view spans all milestones)
+      let removed = removeTaskFromTree(taskId, ms[activeMilestoneIdx]);
+      if (!removed) {
+        for (let i = 0; i < ms.length; i++) {
+          if (i === activeMilestoneIdx) continue;
+          if (removeTaskFromTree(taskId, ms[i])) { removed = true; break; }
+        }
       }
+      // Clean up arrows in every milestone (cheap, prevents orphaned arrows)
+      ms.forEach((m) => {
+        if (m.arrows) {
+          m.arrows = m.arrows.filter((a) => a.fromId !== taskId && a.toId !== taskId);
+        }
+      });
     });
   }, [activeMilestoneIdx, updateMilestones]);
 
@@ -975,6 +1000,7 @@ export default function usePlannerState(initialData) {
     msCollapsed,
     taskOrder,
     allLeaves,
+    allLeavesAllMilestones,
     mk,
     sprintStats,
     totalStats,

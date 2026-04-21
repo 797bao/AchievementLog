@@ -208,6 +208,7 @@ function PlannerInner({ initialData, onSave }) {
         {!state.isMetricsView && (
           <BoardView
             milestone={state.activeMilestone}
+            milestones={state.milestones}
             isSprintOverview={state.isSprintOverview}
             currentBoardId={state.currentBoardId}
             currentBoardPath={state.currentBoardPath}

@@ -18,6 +18,7 @@ import {
 
 export default function BoardView({
   milestone,
+  milestones,
   isSprintOverview,
   currentBoardId,
   currentBoardPath,
@@ -34,9 +35,12 @@ export default function BoardView({
 }) {
   const isActive = isSprintOverview || !!currentBoardId;
 
+  // Sprint overview spans ALL milestones — sprint is a global, time-based concept
   const sprintData = useMemo(() => {
     if (!isSprintOverview) return null;
-    const allLeaves = getAllLeaves(milestone);
+    const sourceMilestones = milestones || [milestone];
+    let allLeaves = [];
+    sourceMilestones.forEach((m) => { allLeaves = allLeaves.concat(getAllLeaves(m)); });
     const filtered = allLeaves.filter((l) => l.sprint === mk);
     const done = filtered.filter((l) => l.status === 'done').length;
     let timeEst = 0;
@@ -46,7 +50,7 @@ export default function BoardView({
       timeLogged += getTaskLoggedTime(l);
     });
     return { filtered, count: filtered.length, done, timeEst: formatTime(timeEst), timeLogged: formatTime(timeLogged) };
-  }, [isSprintOverview, milestone, mk]);
+  }, [isSprintOverview, milestone, milestones, mk]);
 
   const systemData = useMemo(() => {
     if (!currentBoardId) return null;
@@ -79,11 +83,18 @@ export default function BoardView({
   }, [currentBoardId, milestone]);
 
   const boardKey = isSprintOverview
-    ? `sprint_${milestone.id}_${mk}`
+    ? `sprint_all_${mk}`
     : `sys_${currentBoardId}`;
 
   const getSystemName = (tid) => {
-    const sys = findSystemForTask(tid, milestone);
+    // Search active milestone first, then fall back to all milestones (sprint view spans all)
+    let sys = findSystemForTask(tid, milestone);
+    if (!sys && milestones) {
+      for (const m of milestones) {
+        sys = findSystemForTask(tid, m);
+        if (sys) break;
+      }
+    }
     return sys ? sys.name : '';
   };
 
