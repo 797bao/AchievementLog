@@ -71,8 +71,8 @@ export default function KanbanCard({
             <span className="kanban-card-system">{systemName}</span>
           )}
           {parentName && <span className="kanban-card-parent">{parentName}</span>}
-          {expectedMins > 0 && (
-            <span className={`kanban-card-time ${statusCls}`}>
+          {(expectedMins > 0 || loggedMins > 0) && (
+            <span className={`kanban-card-time ${statusCls}${loggedMins > expectedMins && expectedMins > 0 ? ' time-over' : ''}`}>
               {formatTime(loggedMins)}/{formatTime(expectedMins)}
             </span>
           )}

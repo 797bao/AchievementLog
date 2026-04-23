@@ -110,8 +110,26 @@ export default function CanvasViewport({
     } else if (state.type === 'frame') {
       const frame = milestone.frames.find((f) => f.id === state.id);
       if (frame && onOpenBoard) onOpenBoard(state.id, frame.label || 'Frame');
+    } else if (state.type === 'task') {
+      // Left-click on a task opens the edit modal (parity with right-click → Edit)
+      const task = findTask(state.id, milestone);
+      if (task && onOpenModal) {
+        onOpenModal({
+          type: 'edit-task',
+          targetId: state.id,
+          fields: [
+            { key: 'name', label: 'Name', type: 'text', value: task.name || '' },
+            { key: 'description', label: 'Description', type: 'textarea', value: task.description || '' },
+            { key: 'sprint', label: 'Sprint', type: 'sprint-select', value: task.sprint || '' },
+            { key: 'type', label: 'Icon Type', type: 'icon-select', value: task.type || 'script' },
+            { key: 'time', label: 'Expected Time', type: 'text', value: task.time || '', placeholder: 'e.g. 2h, 30m' },
+            { key: 'timeLogs', label: 'Time Logs', type: 'time-logs', value: task.timeLogs || [] },
+            { key: 'status', label: 'Status', type: 'status-select', value: task.status || 'planned' },
+          ],
+        });
+      }
     }
-  }, [milestone, onOpenBoard]);
+  }, [milestone, onOpenBoard, onOpenModal]);
 
   const { onMouseDown: dragMouseDown, onMouseMove: dragMouseMove, onMouseUp: dragMouseUp } = useCanvasDrag({
     mapZoom,
@@ -705,6 +723,26 @@ export default function CanvasViewport({
     copyToClipboard();
   }, [copyToClipboard]);
 
+  /**
+   * Wrap a single-item delete handler so that if the target is part of a
+   * multi-selection, the entire selection is deleted in one shot. Otherwise
+   * falls through to the normal single-item delete.
+   */
+  const handleBulkAwareDelete = useCallback((id, singleHandler) => {
+    const sel = selectionRef.current;
+    if (sel.length > 1 && sel.some((s) => s.id === id) && onDeleteSelected) {
+      onDeleteSelected(sel);
+      clearSelection();
+      return;
+    }
+    if (singleHandler) singleHandler(id);
+  }, [onDeleteSelected, clearSelection]);
+
+  const handleDeleteTask = useCallback((id) => handleBulkAwareDelete(id, onDeleteTask), [handleBulkAwareDelete, onDeleteTask]);
+  const handleDeleteSystem = useCallback((id) => handleBulkAwareDelete(id, onDeleteSystem), [handleBulkAwareDelete, onDeleteSystem]);
+  const handleDeleteFrame = useCallback((id) => handleBulkAwareDelete(id, onDeleteFrame), [handleBulkAwareDelete, onDeleteFrame]);
+  const handleDeleteLooseImage = useCallback((id) => handleBulkAwareDelete(id, onDeleteLooseImage), [handleBulkAwareDelete, onDeleteLooseImage]);
+
   const handlePaste = useCallback((cx, cy) => {
     pasteFromClipboard(cx, cy);
   }, [pasteFromClipboard]);
@@ -781,15 +819,15 @@ export default function CanvasViewport({
           onUpdateTaskStatus={onUpdateTaskStatus}
           onCreateSubSystem={onCreateSubSystem}
           onUpdateSystemColors={onUpdateSystemColors}
-          onDeleteTask={onDeleteTask}
-          onDeleteSystem={onDeleteSystem}
-          onDeleteFrame={onDeleteFrame}
+          onDeleteTask={handleDeleteTask}
+          onDeleteSystem={handleDeleteSystem}
+          onDeleteFrame={handleDeleteFrame}
           onStartArrow={handleStartArrow}
           onAddImage={handleAddImage}
           onUpdateImage={onUpdateImage}
           onUpdateLooseImage={onUpdateLooseImage}
           onDeleteImage={onDeleteImage}
-          onDeleteLooseImage={onDeleteLooseImage}
+          onDeleteLooseImage={handleDeleteLooseImage}
           onMoveImageLayer={onMoveImageLayer}
           onDetachImage={onDetachImage}
           onCopy={handleCopy}
