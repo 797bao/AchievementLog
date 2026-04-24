@@ -621,7 +621,11 @@ function App() {
           />
         </div>
       </main>
-      {activeSection === 'planner' && <Planner isOwner={isOwner} onExit={() => setActiveSection('inbox')} />}
+      {activeSection === 'planner' && (
+        authReady
+          ? <Planner key={user ? user.uid : 'anon'} isOwner={isOwner} onExit={() => setActiveSection('inbox')} />
+          : <div className="planner"><div className="planner-loading">Loading planner&hellip;</div></div>
+      )}
     </div>
   );
 }
