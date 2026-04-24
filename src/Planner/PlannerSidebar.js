@@ -9,6 +9,7 @@ import {
 } from './plannerHelpers';
 
 export default function PlannerSidebar({
+  onExit,
   milestones,
   activeMilestoneIdx,
   boardMonth,
@@ -38,6 +39,12 @@ export default function PlannerSidebar({
 
   return (
     <div className="planner-sidebar">
+      {onExit && (
+        <button className="planner-exit-btn" onClick={onExit} title="Back to main site">
+          &#9664; Back to Main
+        </button>
+      )}
+
       {/* Sprint section */}
       <div className="sb-section">
         <div className="sb-section-title">Sprint</div>

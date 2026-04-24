@@ -11,7 +11,7 @@ import usePlannerFirebase from './hooks/usePlannerFirebase';
 import { findTask, monthKey } from './plannerHelpers';
 
 /* ─── Outer shell: handles Firebase loading ─── */
-export default function Planner({ isOwner }) {
+export default function Planner({ isOwner, onExit }) {
   const { data, isLoading, save } = usePlannerFirebase(isOwner);
 
   if (isLoading) {
@@ -22,11 +22,11 @@ export default function Planner({ isOwner }) {
     );
   }
 
-  return <PlannerInner initialData={data} onSave={isOwner ? save : null} />;
+  return <PlannerInner initialData={data} onSave={isOwner ? save : null} onExit={onExit} />;
 }
 
 /* ─── Inner component: renders once data is ready ─── */
-function PlannerInner({ initialData, onSave }) {
+function PlannerInner({ initialData, onSave, onExit }) {
   const state = usePlannerState(initialData);
   const [modal, setModal] = useState(null);
   const hasMountedRef = useRef(false);
@@ -168,6 +168,7 @@ function PlannerInner({ initialData, onSave }) {
   return (
     <div className="planner">
       <PlannerSidebar
+        onExit={onExit}
         milestones={state.milestones}
         activeMilestoneIdx={state.activeMilestoneIdx}
         boardMonth={state.boardMonth}

@@ -42,10 +42,23 @@ const DEV_ITEMS = [
   { id: 'GameDevHours', label: 'Game Dev', icon: 'redhat' },
 ];
 
+// Deep-link support: `/AchievementLog/planner` opens the planner directly.
+// We use history.pushState (not a redirect / reload) so switching stays instant.
+const ROUTE_BASE = process.env.PUBLIC_URL || '';
+const PLANNER_ROUTE = ROUTE_BASE + '/planner';
+function sectionFromPath(pathname) {
+  // Case-insensitive so /Planner, /PLANNER, /planner all work.
+  const p = (pathname || '').toLowerCase().replace(/\/+$/, ''); // strip trailing slashes
+  if (p === PLANNER_ROUTE.toLowerCase()) return 'planner';
+  return null;
+}
+
 function App() {
   const [user, setUser] = useState(null);
   const [authReady, setAuthReady] = useState(false);
-  const [activeSection, setActiveSection] = useState('inbox');
+  const [activeSection, setActiveSection] = useState(
+    () => sectionFromPath(window.location.pathname) || 'inbox'
+  );
   const [activeExercise, setActiveExercise] = useState(null);
   const [cardioFilter, setCardioFilter] = useState(null);
   const [devFilter, setDevFilter] = useState(null);
@@ -56,6 +69,25 @@ function App() {
   const [pins, setPins] = useState({});
   const [hideCompleted, setHideCompleted] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // ── URL ↔ section sync (deep link to /planner) ──
+  // Push a new history entry whenever the planner opens/closes, and listen
+  // for browser back/forward to keep the section in sync with the URL.
+  useEffect(() => {
+    const target = activeSection === 'planner' ? PLANNER_ROUTE : ROUTE_BASE + '/';
+    if (window.location.pathname !== target) {
+      window.history.pushState(null, '', target + window.location.search + window.location.hash);
+    }
+  }, [activeSection]);
+
+  useEffect(() => {
+    const onPop = () => {
+      const s = sectionFromPath(window.location.pathname);
+      setActiveSection(s || 'inbox');
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
 
   // ── Auth ──
   useEffect(() => {
@@ -589,7 +621,7 @@ function App() {
           />
         </div>
       </main>
-      {activeSection === 'planner' && <Planner isOwner={isOwner} />}
+      {activeSection === 'planner' && <Planner isOwner={isOwner} onExit={() => setActiveSection('inbox')} />}
     </div>
   );
 }

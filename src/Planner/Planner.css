@@ -44,6 +44,29 @@
   z-index: 10;
 }
 
+.planner-exit-btn {
+  display: block;
+  width: calc(100% - 24px);
+  margin: 10px 12px;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid #3c3f47;
+  color: #9aa0a6;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  transition: all 0.15s;
+  text-align: left;
+}
+
+.planner-exit-btn:hover {
+  border-color: #E8985A;
+  color: #E8985A;
+  background: rgba(232, 152, 90, 0.06);
+}
+
 .sb-section {
   padding: 12px 14px;
   border-bottom: 1px solid #2c2f38;
