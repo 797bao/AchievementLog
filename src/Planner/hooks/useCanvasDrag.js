@@ -9,7 +9,12 @@ export default function useCanvasDrag({ mapZoom, screenToCanvas, onDropTask, onD
     const r = el.getBoundingClientRect();
     const ghost = el.cloneNode(true);
     ghost.id = 'drag-ghost';
-    ghost.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;pointer-events:none;z-index:10000;opacity:.85;box-shadow:0 12px 32px rgba(0,0,0,.5);border-radius:10px;transform:rotate(1deg) scale(1.02);transition:none;`;
+    // Match source rect exactly. `overflow:hidden` and `box-sizing:border-box`
+    // keep content from spilling past the frame the way it does on the real
+    // element — if a cloned child's natural height is taller than the original
+    // (flex stretching is lost once the clone is outside its container),
+    // clip it so the preview stays 1:1 with the source rectangle.
+    ghost.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;box-sizing:border-box;overflow:hidden;pointer-events:none;z-index:10000;opacity:.85;box-shadow:0 12px 32px rgba(0,0,0,.5);border-radius:10px;transition:none;`;
     if (multiCount > 1) {
       const badge = document.createElement('div');
       badge.className = 'drag-count-badge';
