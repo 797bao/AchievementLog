@@ -396,6 +396,9 @@ export default function CanvasViewport({
         el: node, dir: rh.dataset.resize,
         startX: e.clientX, startY: e.clientY,
         startW: node.offsetWidth, startH: node.offsetHeight,
+        // Capture current inline position so top/left handles can shift the origin
+        startLeft: parseFloat(node.style.left) || 0,
+        startTop: parseFloat(node.style.top) || 0,
         frameId: node.dataset.frameId || null,
         sysId: node.dataset.sysId || null,
         isSubNode: !node.classList.contains('canvas-node'),
@@ -470,8 +473,24 @@ export default function CanvasViewport({
       const dx = (e.clientX - rs.startX) / mapZoom;
       const dy = (e.clientY - rs.startY) / mapZoom;
       const minW = rs.isSubNode ? 120 : 200;
+      const minH = 100;
+      // Right / bottom edges grow from the top-left origin (unchanged)
       if (rs.dir.indexOf('r') > -1) rs.el.style.width = Math.max(minW, rs.startW + dx) + 'px';
-      if (rs.dir.indexOf('b') > -1) rs.el.style.height = Math.max(100, rs.startH + dy) + 'px';
+      if (rs.dir.indexOf('b') > -1) rs.el.style.height = Math.max(minH, rs.startH + dy) + 'px';
+      // Left / top edges resize AND shift the origin so the OPPOSITE edge stays put.
+      // Sub-nodes (flex-laid-out systems inside a frame) have no x/y to shift.
+      if (rs.dir.indexOf('l') > -1) {
+        const newW = Math.max(minW, rs.startW - dx);
+        const shift = rs.startW - newW;
+        rs.el.style.width = newW + 'px';
+        if (!rs.isSubNode) rs.el.style.left = (rs.startLeft + shift) + 'px';
+      }
+      if (rs.dir.indexOf('t') > -1) {
+        const newH = Math.max(minH, rs.startH - dy);
+        const shift = rs.startH - newH;
+        rs.el.style.height = newH + 'px';
+        if (!rs.isSubNode) rs.el.style.top = (rs.startTop + shift) + 'px';
+      }
       return;
     }
     dragMouseMove(e);
@@ -527,8 +546,12 @@ export default function CanvasViewport({
       const rs = resizeRef.current;
       const newW = parseFloat(rs.el.style.width);
       const newH = parseFloat(rs.el.style.height);
-      if (rs.frameId && onResizeFrame) onResizeFrame(rs.frameId, newW);
-      else if (rs.sysId && rs.el.closest('.loose-system') && onResizeLooseSystem) onResizeLooseSystem(rs.sysId, newW);
+      const newLeft = parseFloat(rs.el.style.left) || 0;
+      const newTop = parseFloat(rs.el.style.top) || 0;
+      const posDx = newLeft - rs.startLeft;
+      const posDy = newTop - rs.startTop;
+      if (rs.frameId && onResizeFrame) onResizeFrame(rs.frameId, newW, newH, posDx, posDy);
+      else if (rs.sysId && rs.el.closest('.loose-system') && onResizeLooseSystem) onResizeLooseSystem(rs.sysId, newW, newH, posDx, posDy);
       else if (rs.sysId && rs.isSubNode && onResizeSubNode) onResizeSubNode(rs.sysId, newW, newH);
       resizeRef.current = null;
       return;

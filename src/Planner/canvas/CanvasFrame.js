@@ -14,7 +14,7 @@ export default function CanvasFrame({ frame, selected }) {
     <div
       className={`canvas-node canvas-frame${selected ? ' selected' : ''}`}
       data-frame-id={frame.id}
-      style={{ left: frame.x, top: frame.y, width: frame.w || 600 }}
+      style={{ left: frame.x, top: frame.y, width: frame.w || 600, height: frame.h || undefined }}
     >
       <div className="frame-drag-bar">
         <span className="frame-label">{frame.label || ''}</span>
@@ -32,7 +32,7 @@ export default function CanvasFrame({ frame, selected }) {
           </div>
         )}
       </div>
-      <ResizeHandle directions={['r', 'b', 'rb']} />
+      <ResizeHandle directions={['l', 'r', 't', 'b', 'tl', 'tr', 'bl', 'rb']} />
     </div>
   );
 }

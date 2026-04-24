@@ -796,6 +796,51 @@
   border-radius: 6px;
 }
 
+.resize-l {
+  left: -5px;
+  top: 16px;
+  bottom: 16px;
+  width: 10px;
+  cursor: ew-resize;
+  border-radius: 3px;
+}
+
+.resize-t {
+  top: -5px;
+  left: 16px;
+  right: 16px;
+  height: 10px;
+  cursor: ns-resize;
+  border-radius: 3px;
+}
+
+.resize-tl {
+  left: -6px;
+  top: -6px;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  border-radius: 6px;
+}
+
+.resize-tr {
+  right: -6px;
+  top: -6px;
+  width: 16px;
+  height: 16px;
+  cursor: nesw-resize;
+  border-radius: 6px;
+}
+
+.resize-bl {
+  left: -6px;
+  bottom: -6px;
+  width: 16px;
+  height: 16px;
+  cursor: nesw-resize;
+  border-radius: 6px;
+}
+
 .resize-handle:hover {
   background: rgba(215, 104, 31, 0.25);
 }

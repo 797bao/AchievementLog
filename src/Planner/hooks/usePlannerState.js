@@ -344,17 +344,25 @@ export default function usePlannerState(initialData) {
     });
   }, [activeMilestoneIdx, updateMilestones]);
 
-  const resizeFrame = useCallback((frameId, newWidth) => {
+  const resizeFrame = useCallback((frameId, newWidth, newHeight, posDx, posDy) => {
     updateMilestones((ms) => {
       const frame = ms[activeMilestoneIdx].frames.find((f) => f.id === frameId);
-      if (frame) frame.w = newWidth;
+      if (!frame) return;
+      if (newWidth && !isNaN(newWidth)) frame.w = newWidth;
+      if (newHeight && !isNaN(newHeight)) frame.h = newHeight;
+      if (posDx) frame.x = (frame.x || 0) + posDx;
+      if (posDy) frame.y = (frame.y || 0) + posDy;
     });
   }, [activeMilestoneIdx, updateMilestones]);
 
-  const resizeLooseSystem = useCallback((sysId, newWidth) => {
+  const resizeLooseSystem = useCallback((sysId, newWidth, newHeight, posDx, posDy) => {
     updateMilestones((ms) => {
       const sys = (ms[activeMilestoneIdx].looseSystems || []).find((s) => s.id === sysId);
-      if (sys) sys.w = newWidth;
+      if (!sys) return;
+      if (newWidth && !isNaN(newWidth)) sys.w = newWidth;
+      if (newHeight && !isNaN(newHeight)) sys.h = newHeight;
+      if (posDx) sys.x = (sys.x || 0) + posDx;
+      if (posDy) sys.y = (sys.y || 0) + posDy;
     });
   }, [activeMilestoneIdx, updateMilestones]);
 

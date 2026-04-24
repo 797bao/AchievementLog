@@ -11,10 +11,10 @@ export default function StandaloneNode({ frame, selected }) {
       className={`canvas-node standalone-node${selected ? ' selected' : ''}`}
       data-frame-id={frame.id}
       data-sys-id={sys.id}
-      style={{ left: frame.x, top: frame.y, width: frame.w || 300 }}
+      style={{ left: frame.x, top: frame.y, width: frame.w || 300, height: frame.h || undefined }}
     >
       <SystemBox system={sys} />
-      <ResizeHandle directions={['r', 'b', 'rb']} />
+      <ResizeHandle directions={['l', 'r', 't', 'b', 'tl', 'tr', 'bl', 'rb']} />
     </div>
   );
 }
