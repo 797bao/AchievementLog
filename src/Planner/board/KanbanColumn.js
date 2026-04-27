@@ -1,5 +1,6 @@
 import React from 'react';
 import { STATUS_LABELS } from '../plannerData';
+import { getTaskLoggedTime, formatTime } from '../plannerHelpers';
 import KanbanCard from './KanbanCard';
 
 export default function KanbanColumn({
@@ -18,10 +19,19 @@ export default function KanbanColumn({
 }) {
   const headerClass = status === 'progress' ? 'kh-progress' : `kh-${status}`;
 
+  // Total minutes logged on tasks currently in this column
+  const totalLoggedMins = items.reduce((sum, t) => sum + getTaskLoggedTime(t), 0);
+
   return (
     <div className="kanban-col">
-      <div className={`kanban-col-header ${headerClass}`}>
+      <div
+        className={`kanban-col-header ${headerClass}`}
+        title={totalLoggedMins > 0 ? `Total time logged: ${formatTime(totalLoggedMins)}` : undefined}
+      >
         {STATUS_LABELS[status]} {items.length}
+        {totalLoggedMins > 0 && (
+          <span className="kanban-col-time"> &middot; {formatTime(totalLoggedMins)}</span>
+        )}
       </div>
       <div
         className="kanban-cards"

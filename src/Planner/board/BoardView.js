@@ -14,9 +14,10 @@ import {
   getTaskLoggedTime,
   monthKey,
   monthLabel,
-  wasLoggedToday,
-  passesTodayFilter,
+  passesDateRangeFilter,
+  sumMinutesInRange,
   sumTodayMinutes,
+  todayDateStr,
 } from '../plannerHelpers';
 
 export default function BoardView({
@@ -36,9 +37,22 @@ export default function BoardView({
   onDeleteTask,
   onCreateTaskInSystem,
 }) {
+  // ── Filter / view-mode state ──
+  // Date range filter (default: today → today, disabled). When enabled, applies
+  // the visibility rule from passesDateRangeFilter to whatever set is on screen.
+  const [filterEnabled, setFilterEnabled] = useState(false);
+  const [filterStart, setFilterStart] = useState(() => todayDateStr());
+  const [filterEnd, setFilterEnd] = useState(() => todayDateStr());
+  // Global view mode — when true, the kanban shows ALL leaf tasks across every
+  // milestone (regardless of which board the user is "in"), still subject to
+  // the date-range filter.
+  const [globalView, setGlobalView] = useState(false);
+
   const isActive = isSprintOverview || !!currentBoardId;
-  // "Today Only" filter state (sprint view only)
-  const [todayOnly, setTodayOnly] = useState(false);
+
+  // Helper: apply current date filter to a list of leaves
+  const applyFilter = (leaves) =>
+    filterEnabled ? leaves.filter((l) => passesDateRangeFilter(l, filterStart, filterEnd)) : leaves;
 
   // Sprint overview spans ALL milestones — sprint is a global, time-based concept
   const sprintData = useMemo(() => {
@@ -47,7 +61,7 @@ export default function BoardView({
     let allLeaves = [];
     sourceMilestones.forEach((m) => { allLeaves = allLeaves.concat(getAllLeaves(m)); });
     const sprintLeaves = allLeaves.filter((l) => l.sprint === mk);
-    const filtered = todayOnly ? sprintLeaves.filter(passesTodayFilter) : sprintLeaves;
+    const filtered = filterEnabled ? sprintLeaves.filter((l) => passesDateRangeFilter(l, filterStart, filterEnd)) : sprintLeaves;
 
     const done = filtered.filter((l) => l.status === 'done').length;
     let timeEst = 0;
@@ -57,6 +71,7 @@ export default function BoardView({
       timeLogged += getTaskLoggedTime(l);
     });
     const todayMins = sumTodayMinutes(sprintLeaves);
+    const rangeMins = filterEnabled ? sumMinutesInRange(sprintLeaves, filterStart, filterEnd) : todayMins;
     return {
       filtered,
       count: filtered.length,
@@ -64,45 +79,69 @@ export default function BoardView({
       timeEst: formatTime(timeEst),
       timeLogged: formatTime(timeLogged),
       todayMins,
+      rangeMins,
     };
-  }, [isSprintOverview, milestone, milestones, mk, todayOnly]);
+  }, [isSprintOverview, milestone, milestones, mk, filterEnabled, filterStart, filterEnd]);
+
+  // Global data: all leaves across every milestone, optionally date-filtered.
+  const globalData = useMemo(() => {
+    if (!globalView) return null;
+    const sourceMilestones = milestones || [milestone];
+    let allLeaves = [];
+    sourceMilestones.forEach((m) => { allLeaves = allLeaves.concat(getAllLeaves(m)); });
+    const filtered = filterEnabled ? allLeaves.filter((l) => passesDateRangeFilter(l, filterStart, filterEnd)) : allLeaves;
+    const done = filtered.filter((l) => l.status === 'done').length;
+    const total = filtered.length;
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    let expectedT = 0, loggedT = 0;
+    filtered.forEach((l) => { expectedT += getTaskExpectedTime(l); loggedT += getTaskLoggedTime(l); });
+    const todayMins = sumTodayMinutes(allLeaves);
+    const rangeMins = filterEnabled ? sumMinutesInRange(allLeaves, filterStart, filterEnd) : todayMins;
+    return {
+      filtered, count: total, done, prog: { done, total, pct },
+      expectedT: formatTime(expectedT), loggedT: formatTime(loggedT),
+      rawExpected: expectedT, rawLogged: loggedT,
+      todayMins, rangeMins,
+    };
+  }, [globalView, milestone, milestones, filterEnabled, filterStart, filterEnd]);
 
   const systemData = useMemo(() => {
     if (!currentBoardId) return null;
 
-    // Try as system/node first
-    const node = findTask(currentBoardId, milestone);
-    if (node) {
-      const rawLeaves = getLeaves(node);
-      const allLeaves = todayOnly ? rawLeaves.filter(passesTodayFilter) : rawLeaves;
-      // Recompute progress/time from the visible set so the header reflects the filter
+    const buildData = (rawLeaves, extras) => {
+      const allLeaves = applyFilter(rawLeaves);
       const done = allLeaves.filter((l) => l.status === 'done').length;
       const total = allLeaves.length;
       const pct = total > 0 ? Math.round((done / total) * 100) : 0;
       let expectedT = 0, loggedT = 0;
       allLeaves.forEach((l) => { expectedT += getTaskExpectedTime(l); loggedT += getTaskLoggedTime(l); });
       const todayMins = sumTodayMinutes(rawLeaves);
-      return { node, allLeaves, prog: { done, total, pct }, expectedT: formatTime(expectedT), loggedT: formatTime(loggedT), rawExpected: expectedT, rawLogged: loggedT, isFrame: false, todayMins };
-    }
+      const rangeMins = filterEnabled ? sumMinutesInRange(rawLeaves, filterStart, filterEnd) : todayMins;
+      return {
+        allLeaves,
+        prog: { done, total, pct },
+        expectedT: formatTime(expectedT),
+        loggedT: formatTime(loggedT),
+        rawExpected: expectedT,
+        rawLogged: loggedT,
+        todayMins,
+        rangeMins,
+        ...extras,
+      };
+    };
 
-    // Try as frame
+    const node = findTask(currentBoardId, milestone);
+    if (node) return buildData(getLeaves(node), { node, isFrame: false });
+
     const frame = milestone.frames.find((f) => f.id === currentBoardId);
     if (frame) {
       let rawLeaves = [];
       frame.systems.forEach((sys) => { rawLeaves = rawLeaves.concat(getLeaves(sys)); });
       (frame.tasks || []).forEach((t) => rawLeaves.push(t));
-      const allLeaves = todayOnly ? rawLeaves.filter(passesTodayFilter) : rawLeaves;
-      const done = allLeaves.filter((l) => l.status === 'done').length;
-      const total = allLeaves.length;
-      const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-      let expectedT = 0, loggedT = 0;
-      allLeaves.forEach((l) => { expectedT += getTaskExpectedTime(l); loggedT += getTaskLoggedTime(l); });
-      const todayMins = sumTodayMinutes(rawLeaves);
-      return { node: null, frame, allLeaves, prog: { done, total, pct }, expectedT: formatTime(expectedT), loggedT: formatTime(loggedT), rawExpected: expectedT, rawLogged: loggedT, isFrame: true, todayMins };
+      return buildData(rawLeaves, { node: null, frame, isFrame: true });
     }
-
     return null;
-  }, [currentBoardId, milestone, todayOnly]);
+  }, [currentBoardId, milestone, filterEnabled, filterStart, filterEnd]);
 
   const boardKey = isSprintOverview
     ? `sprint_all_${mk}`
@@ -165,6 +204,78 @@ export default function BoardView({
 
   if (!isActive) return null;
 
+  // Shared filter / view-mode bar — reused across sprint, system/frame, and global views.
+  const FilterBar = ({ todayMins, rangeMins }) => (
+    <div className="board-filter-row">
+      <div className="board-filter-group board-filter-range">
+        <label className="board-filter-label">From</label>
+        <input
+          type="date"
+          className="tl-date board-filter-date"
+          value={filterStart}
+          onChange={(e) => { setFilterStart(e.target.value); if (!filterEnabled) setFilterEnabled(true); }}
+        />
+        <label className="board-filter-label">To</label>
+        <input
+          type="date"
+          className="tl-date board-filter-date"
+          value={filterEnd}
+          onChange={(e) => { setFilterEnd(e.target.value); if (!filterEnabled) setFilterEnabled(true); }}
+        />
+        <button
+          className={`board-filter-btn${filterEnabled ? ' active' : ''}`}
+          onClick={() => setFilterEnabled((v) => !v)}
+          title="Toggle date-range filter"
+        >
+          {filterEnabled ? 'Filter ON' : 'Filter OFF'}
+        </button>
+        <button
+          className="board-filter-btn"
+          onClick={() => { const t = todayDateStr(); setFilterStart(t); setFilterEnd(t); setFilterEnabled(true); }}
+          title="Set range to today"
+        >
+          Today
+        </button>
+        <button
+          className={`board-filter-btn${globalView ? ' active' : ''}`}
+          onClick={() => setGlobalView((v) => !v)}
+          title="Toggle global view (all tasks across every milestone)"
+        >
+          &#127760; {globalView ? 'Global ON' : 'Global'}
+        </button>
+        <span className="board-filter-today-total" title="Time logged in the current range (or today, if filter is off)">
+          {filterEnabled ? 'Range' : 'Today'}: <span className="val">{formatTime(filterEnabled ? rangeMins : todayMins)}</span>
+        </span>
+      </div>
+    </div>
+  );
+
+  // ── GLOBAL VIEW ── takes priority over the underlying board.
+  if (globalView && globalData) {
+    return (
+      <div className={`board-view${isActive ? ' active' : ''}`}>
+        <div className="board-header">
+          <button className="board-back" onClick={onCloseBoard}>&#9664; Map</button>
+          <div className="board-title">&#127760; Global</div>
+          <div style={{ width: 100 }} />
+        </div>
+        <div className="board-stats">
+          <span className="val">{globalData.prog.done}/{globalData.prog.total}</span> tasks &middot;{' '}
+          <span className="val">{globalData.prog.pct}%</span> &middot;{' '}
+          <span className={`val${globalData.rawLogged > globalData.rawExpected && globalData.rawExpected > 0 ? ' time-over' : ''}`}>{globalData.loggedT}</span>/{globalData.expectedT}
+        </div>
+        <FilterBar todayMins={globalData.todayMins} rangeMins={globalData.rangeMins} />
+        <KanbanBoard
+          items={globalData.filtered} showSystem={true}
+          boardKey={`global_${filterEnabled ? filterStart + '_' + filterEnd : 'all'}`} taskOrder={taskOrder}
+          onStatusChange={onStatusChange} onUpdateTaskOrder={onUpdateTaskOrder}
+          getSystemName={getSystemName} getParentName={() => ''}
+          onOpenModal={onOpenModal} onDeleteTask={onDeleteTask}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className={`board-view${isActive ? ' active' : ''}`}>
       {isSprintOverview && sprintData && (
@@ -185,19 +296,8 @@ export default function BoardView({
             <button className="bm-btn" onClick={() => onChangeSidebarMonth(-1)}>&#9664;</button>
             <div className="bm-label">{monthLabel(boardMonth.year, boardMonth.month)}</div>
             <button className="bm-btn" onClick={() => onChangeSidebarMonth(1)}>&#9654;</button>
-            <div className="board-filter-group">
-              <button
-                className={`board-filter-btn${todayOnly ? ' active' : ''}`}
-                onClick={() => setTodayOnly((v) => !v)}
-                title="Show only tasks with a log entry from today (+ unstarted tasks)"
-              >
-                &#128197; Today Only
-              </button>
-              <span className="board-filter-today-total" title="Total time logged today for this view">
-                Today: <span className="val">{formatTime(sprintData.todayMins)}</span>
-              </span>
-            </div>
           </div>
+          <FilterBar todayMins={sprintData.todayMins} rangeMins={sprintData.rangeMins} />
           <KanbanBoard
             items={sprintData.filtered} showSystem={true}
             boardKey={boardKey} taskOrder={taskOrder}
@@ -222,20 +322,7 @@ export default function BoardView({
             <span className="val">{systemData.prog.pct}%</span> &middot;{' '}
             <span className={`val${systemData.rawLogged > systemData.rawExpected && systemData.rawExpected > 0 ? ' time-over' : ''}`}>{systemData.loggedT}</span>/{systemData.expectedT}
           </div>
-          <div className="board-filter-row">
-            <div className="board-filter-group">
-              <button
-                className={`board-filter-btn${todayOnly ? ' active' : ''}`}
-                onClick={() => setTodayOnly((v) => !v)}
-                title="Show only tasks with a log entry from today (+ unstarted tasks)"
-              >
-                &#128197; Today Only
-              </button>
-              <span className="board-filter-today-total" title="Total time logged today for this view">
-                Today: <span className="val">{formatTime(systemData.todayMins)}</span>
-              </span>
-            </div>
-          </div>
+          <FilterBar todayMins={systemData.todayMins} rangeMins={systemData.rangeMins} />
           <KanbanBoard
             items={systemData.allLeaves} showSystem={!!systemData.isFrame}
             boardKey={boardKey} taskOrder={taskOrder}

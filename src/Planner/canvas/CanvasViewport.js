@@ -671,53 +671,63 @@ export default function CanvasViewport({
     };
   }, [handleMouseMove, handleMouseUp]);
 
-  // ─── Touch input → synthesised mouse events ───
-  // Strategy: a single touch is fed through the existing mouse pipeline as a
-  // left-button mousedown/mousemove/mouseup. A second touch flips the gesture
-  // into pinch-zoom and cancels the in-flight single-touch interaction. A
-  // long-press on a still finger fires a synthetic right-click contextmenu.
+  // ─── Touch input → existing mouse pipeline ───
+  // Strategy:
+  //   • Touchstart only ARMs the long-press timer; it does NOT call
+  //     handleMouseDown. That avoids opening an in-flight drag we'd then have
+  //     to spuriously close (which previously triggered onMapClick → edit
+  //     modal, swallowing the contextmenu we wanted from the long-press).
+  //   • First real movement past tolerance lazily fires handleMouseDown with
+  //     the START coordinates (so existing drag/pan code initialises with the
+  //     correct grab offset), then handleMouseMove with the live coordinates.
+  //   • Plain taps (no movement, no long-press) DON'T preventDefault — we let
+  //     the browser synthesise mousedown/mouseup/click naturally, which runs
+  //     handleMouseDown + handleMouseUp through React just like a mouse click,
+  //     so the existing left-click-to-edit behaviour still works.
+  //   • Long-press (~500 ms still finger) fires handleContextMenu directly
+  //     and arms a flag so the eventual touchend preventDefaults the browser's
+  //     synthetic click (otherwise a click would fire on top of the context
+  //     menu the moment the user lifts).
+  //   • Two fingers → pinch-zoom; cancels any in-flight gesture.
   useEffect(() => {
     const vp = vpRef.current;
     if (!vp) return;
 
     const LONG_PRESS_MS = 500;
-    const TAP_MOVE_TOLERANCE = 10; // px before a hold becomes a drag
+    const TAP_MOVE_TOLERANCE = 10;
 
-    const fakeEvent = (touch, button, target, base) => ({
+    const fakeEvent = (touch, button, base) => ({
       button,
       clientX: touch.clientX,
       clientY: touch.clientY,
-      target: target || (base && base.target) || document.elementFromPoint(touch.clientX, touch.clientY),
+      target: document.elementFromPoint(touch.clientX, touch.clientY) || (base && base.target),
       shiftKey: !!(base && base.shiftKey),
       ctrlKey: !!(base && base.ctrlKey),
       metaKey: !!(base && base.metaKey),
-      preventDefault: () => { if (base && base.preventDefault) base.preventDefault(); },
-      stopPropagation: () => { if (base && base.stopPropagation) base.stopPropagation(); },
+      preventDefault: () => {},
+      stopPropagation: () => {},
     });
 
-    const distance = (t1, t2) => {
-      const dx = t2.clientX - t1.clientX;
-      const dy = t2.clientY - t1.clientY;
-      return Math.hypot(dx, dy);
-    };
-
+    const distance = (t1, t2) => Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
     const cancelLongPress = () => {
       const tr = touchRef.current;
       if (tr.longPressTimer) { clearTimeout(tr.longPressTimer); tr.longPressTimer = null; }
     };
 
     const onTouchStart = (e) => {
-      // 2-finger touch — pinch zoom
+      const tr = touchRef.current;
+
+      // 2-finger pinch
       if (e.touches.length === 2) {
         cancelLongPress();
-        // Cancel any in-flight single-touch interaction so it doesn't interfere
-        if (touchRef.current.activeSingle) {
-          handleMouseUp(fakeEvent(e.changedTouches[0], 0, null, e));
-          touchRef.current.activeSingle = false;
+        // If a 1-finger drag was in progress, end it cleanly
+        if (tr.dragInited) {
+          handleMouseUp(fakeEvent(e.changedTouches[0], 0, e));
+          tr.dragInited = false;
         }
         const t1 = e.touches[0];
         const t2 = e.touches[1];
-        touchRef.current.pinch = {
+        tr.pinch = {
           startDist: distance(t1, t2),
           startZoom: mapZoom,
           midX: (t1.clientX + t2.clientX) / 2,
@@ -729,27 +739,43 @@ export default function CanvasViewport({
 
       if (e.touches.length !== 1) return;
       const touch = e.touches[0];
-      touchRef.current.startX = touch.clientX;
-      touchRef.current.startY = touch.clientY;
-      touchRef.current.moved = false;
-      touchRef.current.longPressFired = false;
-      touchRef.current.activeSingle = true;
+      tr.startX = touch.clientX;
+      tr.startY = touch.clientY;
+      tr.startTarget = touch.target;
+      tr.moved = false;
+      tr.longPressFired = false;
+      tr.dragInited = false;
 
-      // Schedule long-press → synthetic right-click context menu.
-      touchRef.current.longPressTimer = setTimeout(() => {
-        if (touchRef.current.moved) return;
+      // Capture a pointer snapshot so the timer callback has all it needs.
+      const startSnapshot = {
+        clientX: touch.clientX,
+        clientY: touch.clientY,
+        target: document.elementFromPoint(touch.clientX, touch.clientY),
+        shiftKey: e.shiftKey,
+        ctrlKey: e.ctrlKey,
+        metaKey: e.metaKey,
+      };
+
+      tr.longPressTimer = setTimeout(() => {
+        if (touchRef.current.moved || touchRef.current.dragInited) return;
         touchRef.current.longPressFired = true;
-        // First, end the in-flight "left mousedown" so we don't have a stuck drag
-        handleMouseUp(fakeEvent(touch, 0, null, e));
-        touchRef.current.activeSingle = false;
-        // Then fire the contextmenu via the existing handler
-        handleContextMenu(fakeEvent(touch, 2, null, e));
+        // Build a fresh fake event from the captured snapshot — `e` is no
+        // longer the active event by the time the timer fires.
+        const synthetic = {
+          button: 2,
+          clientX: startSnapshot.clientX,
+          clientY: startSnapshot.clientY,
+          target: startSnapshot.target,
+          shiftKey: startSnapshot.shiftKey,
+          ctrlKey: startSnapshot.ctrlKey,
+          metaKey: startSnapshot.metaKey,
+          preventDefault: () => {},
+          stopPropagation: () => {},
+        };
+        handleContextMenu(synthetic);
       }, LONG_PRESS_MS);
-
-      // Begin a left-button mousedown immediately so dragging draggable
-      // elements works out of the box (the user's finger is already down).
-      handleMouseDown(fakeEvent(touch, 0, null, e));
-      e.preventDefault();
+      // No preventDefault here — let the browser synthesise click for plain
+      // taps. We'll preventDefault in touchend if we end up handling the gesture.
     };
 
     const onTouchMove = (e) => {
@@ -759,10 +785,7 @@ export default function CanvasViewport({
         const t1 = e.touches[0];
         const t2 = e.touches[1];
         const newDist = distance(t1, t2);
-        const ratio = newDist / tr.pinch.startDist;
-        const targetZoom = Math.max(0.2, Math.min(3, tr.pinch.startZoom * ratio));
-        // We feed an absolute scale ratio relative to current zoom each frame,
-        // anchored at the original midpoint, so the math is stable.
+        const targetZoom = Math.max(0.2, Math.min(3, tr.pinch.startZoom * (newDist / tr.pinch.startDist)));
         const liveRatio = targetZoom / mapZoom;
         if (Math.abs(liveRatio - 1) > 0.001 && vpRef.current) {
           zoomAtPoint(liveRatio, tr.pinch.midX, tr.pinch.midY, vpRef.current.getBoundingClientRect());
@@ -771,47 +794,72 @@ export default function CanvasViewport({
         return;
       }
 
-      if (e.touches.length !== 1 || tr.longPressFired) return;
+      if (e.touches.length !== 1) return;
+      // After long-press has fired, ignore further movement — the user is
+      // navigating the context menu (or about to lift).
+      if (tr.longPressFired) { e.preventDefault(); return; }
+
       const touch = e.touches[0];
       const dx = touch.clientX - tr.startX;
       const dy = touch.clientY - tr.startY;
-      if (!tr.moved && (Math.abs(dx) > TAP_MOVE_TOLERANCE || Math.abs(dy) > TAP_MOVE_TOLERANCE)) {
+
+      if (!tr.moved && Math.hypot(dx, dy) > TAP_MOVE_TOLERANCE) {
         tr.moved = true;
         cancelLongPress();
+        // NOW initialise the drag, using the ORIGINAL start coords so the
+        // grab offset matches where the finger first landed.
+        const startTouch = { clientX: tr.startX, clientY: tr.startY };
+        handleMouseDown(fakeEvent(startTouch, 0, e));
+        tr.dragInited = true;
       }
-      handleMouseMove(fakeEvent(touch, 0, null, e));
-      e.preventDefault();
+      if (tr.dragInited) {
+        handleMouseMove(fakeEvent(touch, 0, e));
+        e.preventDefault();
+      }
     };
 
     const onTouchEnd = (e) => {
       const tr = touchRef.current;
       cancelLongPress();
 
+      // End of pinch
       if (tr.pinch && e.touches.length < 2) {
         tr.pinch = null;
-        // If one finger is still down, restart a single-touch interaction
         if (e.touches.length === 1) {
+          // One finger remains — treat as a fresh touchstart so the user can
+          // continue with a single-touch gesture.
           const touch = e.touches[0];
           tr.startX = touch.clientX;
           tr.startY = touch.clientY;
           tr.moved = false;
           tr.longPressFired = false;
-          tr.activeSingle = true;
-          handleMouseDown(fakeEvent(touch, 0, null, e));
+          tr.dragInited = false;
         }
+        e.preventDefault();
         return;
       }
 
-      if (tr.longPressFired) { tr.longPressFired = false; tr.activeSingle = false; return; }
-      if (!tr.activeSingle) return;
-      tr.activeSingle = false;
+      // Long-press: contextmenu already opened. Suppress the synthesised click.
+      if (tr.longPressFired) {
+        tr.longPressFired = false;
+        e.preventDefault();
+        return;
+      }
 
-      const touch = e.changedTouches[0];
-      handleMouseUp(fakeEvent(touch, 0, null, e));
+      // Drag ended: we handled the gesture, suppress the synthesised click too.
+      if (tr.dragInited) {
+        const touch = e.changedTouches[0];
+        handleMouseUp(fakeEvent(touch, 0, e));
+        tr.dragInited = false;
+        e.preventDefault();
+        return;
+      }
+
+      // Plain tap: do nothing. Browser synthesises mousedown→mouseup→click,
+      // which runs handleMouseDown + handleMouseUp via React's listeners and
+      // ends up calling onMapClick → edit modal, etc.
     };
 
-    // touchmove must be non-passive so we can preventDefault to stop the page
-    // scrolling/zooming while the user is interacting with the canvas.
     const opts = { passive: false };
     vp.addEventListener('touchstart', onTouchStart, opts);
     vp.addEventListener('touchmove', onTouchMove, opts);

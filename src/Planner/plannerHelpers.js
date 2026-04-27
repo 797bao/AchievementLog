@@ -69,6 +69,78 @@ export function sumTodayMinutes(leaves) {
   return total;
 }
 
+/**
+ * Read the local-time timestamp for a log entry. Prefers an explicit
+ * `loggedAt` ISO string; falls back to the millisecond timestamp embedded
+ * in the entry's `id` (`tl-<ms>-…`). Returns null if neither parses.
+ */
+function logTimestamp(log) {
+  if (!log) return null;
+  if (log.loggedAt) {
+    const parsed = Date.parse(log.loggedAt);
+    if (!isNaN(parsed)) return parsed;
+  }
+  if (typeof log.id === 'string' && log.id.startsWith('tl-')) {
+    const parts = log.id.split('-');
+    const n = parseInt(parts[1], 10);
+    if (!isNaN(n) && n > 0) return n;
+  }
+  return null;
+}
+
+/**
+ * True when the given log was created on (or between) the given local-date
+ * boundaries, inclusive. `startStr` / `endStr` use 'YYYY-MM-DD' format.
+ */
+export function wasLoggedInRange(log, startStr, endStr) {
+  const ts = logTimestamp(log);
+  if (ts == null) return false;
+  const d = new Date(ts);
+  // Compare on a local-day basis by zero-ing the time component.
+  const dKey = d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+  const parseKey = (s) => {
+    const parts = s.split('-').map((n) => parseInt(n, 10));
+    return parts[0] * 10000 + parts[1] * 100 + parts[2];
+  };
+  const startKey = parseKey(startStr);
+  const endKey = parseKey(endStr);
+  return dKey >= startKey && dKey <= endKey;
+}
+
+/**
+ * Date-range visibility rule (generalisation of passesTodayFilter):
+ *   • has a log in [start, end]                       → visible
+ *   • has logs but none in range                      → hidden
+ *   • no logs, status 'done'                          → hidden
+ *   • no logs, status not 'done'                      → visible (unstarted)
+ */
+export function passesDateRangeFilter(leaf, startStr, endStr) {
+  const logs = (leaf && leaf.timeLogs) || [];
+  if (logs.some((log) => wasLoggedInRange(log, startStr, endStr))) return true;
+  if (logs.length > 0) return false;
+  return leaf && leaf.status !== 'done';
+}
+
+/** Sum (minutes) of all log entries in `leaves` falling in [start, end]. */
+export function sumMinutesInRange(leaves, startStr, endStr) {
+  let total = 0;
+  (leaves || []).forEach((l) => {
+    (l.timeLogs || []).forEach((log) => {
+      if (wasLoggedInRange(log, startStr, endStr)) total += parseTime(log.duration);
+    });
+  });
+  return total;
+}
+
+/** Today's date as 'YYYY-MM-DD' (local time). */
+export function todayDateStr() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 /* ─── Tree traversal ─── */
 export function getLeaves(node) {
   if (!node.children) return [node]; // leaf task
