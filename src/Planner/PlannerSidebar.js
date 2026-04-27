@@ -10,6 +10,9 @@ import {
 
 export default function PlannerSidebar({
   sidebarOpen,
+  sidebarWidth,
+  onResize,
+  onCollapse,
   onExit,
   milestones,
   activeMilestoneIdx,
@@ -38,8 +41,47 @@ export default function PlannerSidebar({
     return () => document.removeEventListener('click', handler);
   }, [msCtxMenu]);
 
+  // Drag-resize: capture width at mousedown, follow the cursor, clamp.
+  const onResizeMouseDown = (e) => {
+    if (!onResize) return;
+    const startX = e.clientX;
+    const startW = sidebarWidth || 240;
+    const onMove = (ev) => {
+      const dx = ev.clientX - startX;
+      const next = Math.max(180, Math.min(480, startW + dx));
+      onResize(next);
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    // While dragging, lock the cursor and prevent text selection across the page.
+    document.body.style.cursor = 'ew-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  };
+
+  // Inline width is only applied on desktop. On mobile (<= 768px) the CSS
+  // takes over and pins the sidebar to a fixed width / off-canvas drawer.
+  const widthStyle = sidebarWidth ? { width: sidebarWidth } : undefined;
+
   return (
-    <div className={`planner-sidebar${sidebarOpen ? ' open' : ''}`}>
+    <div
+      className={`planner-sidebar${sidebarOpen ? ' open' : ''}`}
+      style={widthStyle}
+    >
+      {onCollapse && (
+        <button
+          className="planner-sidebar-collapse-btn"
+          onClick={onCollapse}
+          title="Collapse sidebar"
+          aria-label="Collapse sidebar"
+        >&#9664;</button>
+      )}
       {onExit && (
         <button className="planner-exit-btn" onClick={onExit} title="Back to main site">
           &#9664; Back to Main
@@ -200,6 +242,16 @@ export default function PlannerSidebar({
             </div>
           )}
         </div>
+      )}
+
+      {/* Drag-resize handle on the right edge (desktop only — mobile uses
+          a fixed-width drawer). */}
+      {onResize && (
+        <div
+          className="planner-sidebar-resize"
+          onMouseDown={onResizeMouseDown}
+          title="Drag to resize"
+        />
       )}
     </div>
   );

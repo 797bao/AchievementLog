@@ -30,6 +30,16 @@ function PlannerInner({ initialData, onSave, onExit }) {
   const state = usePlannerState(initialData);
   const [modal, setModal] = useState(null);
   const hasMountedRef = useRef(false);
+  // A "request token" to ask BoardView to switch into Global mode pinned to
+  // a specific date. New {date, ts} is generated each time so BoardView's
+  // useEffect picks it up via reference equality.
+  const [globalDayRequest, setGlobalDayRequest] = useState(null);
+
+  const handleOpenGlobalDay = useCallback((dateStr) => {
+    if (!dateStr) return;
+    state.closeMetrics();
+    setGlobalDayRequest({ date: dateStr, ts: Date.now() });
+  }, [state]);
 
   /* ─── Auto-save to Firebase on data changes ─── */
   useEffect(() => {
@@ -38,8 +48,8 @@ function PlannerInner({ initialData, onSave, onExit }) {
       hasMountedRef.current = true;
       return;
     }
-    onSave(state.milestones, state.taskOrder, state.activeMilestoneIdx);
-  }, [state.milestones, state.taskOrder, state.activeMilestoneIdx, onSave]);
+    onSave(state.milestones, state.taskOrder, state.activeMilestoneIdx, state.sidebarWidth);
+  }, [state.milestones, state.taskOrder, state.activeMilestoneIdx, state.sidebarWidth, onSave]);
 
   // Keyboard shortcuts: Escape, Ctrl+Z, Ctrl+Shift+Z
   useEffect(() => {
@@ -172,6 +182,12 @@ function PlannerInner({ initialData, onSave, onExit }) {
   // the canvas comes back into view on mobile.
   const wrap = (fn) => (...args) => { closeSidebar(); return fn && fn(...args); };
 
+  // Desktop sidebar: width is persisted to Firebase via usePlannerState;
+  // collapsed-ness is intentionally local (per-session UI preference).
+  const sidebarWidth = state.sidebarWidth;
+  const setSidebarWidth = state.setSidebarWidth;
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
   return (
     <div className="planner">
       <button
@@ -185,8 +201,19 @@ function PlannerInner({ initialData, onSave, onExit }) {
         className={`planner-sidebar-overlay${sidebarOpen ? ' open' : ''}`}
         onClick={closeSidebar}
       />
-      <PlannerSidebar
+      {sidebarCollapsed && (
+        <button
+          className="planner-sidebar-expand-btn"
+          onClick={() => setSidebarCollapsed(false)}
+          title="Show sidebar"
+          aria-label="Show sidebar"
+        >&#9654;</button>
+      )}
+      {!sidebarCollapsed && <PlannerSidebar
         sidebarOpen={sidebarOpen}
+        sidebarWidth={sidebarWidth}
+        onResize={setSidebarWidth}
+        onCollapse={() => setSidebarCollapsed(true)}
         onExit={onExit}
         milestones={state.milestones}
         activeMilestoneIdx={state.activeMilestoneIdx}
@@ -204,7 +231,7 @@ function PlannerInner({ initialData, onSave, onExit }) {
         onRenameMilestone={handleRenameMilestone}
         onDeleteMilestone={handleDeleteMilestone}
         onMoveMilestone={state.moveMilestone}
-      />
+      />}
 
       <div className="planner-content">
         {!state.showBoard && !state.isMetricsView && (
@@ -274,6 +301,7 @@ function PlannerInner({ initialData, onSave, onExit }) {
             onOpenModal={handleOpenModal}
             onDeleteTask={state.deleteTask}
             onCreateTaskInSystem={state.createTaskInSystem}
+            globalDayRequest={globalDayRequest}
           />
         )}
 
@@ -281,6 +309,7 @@ function PlannerInner({ initialData, onSave, onExit }) {
           <MetricsView
             milestones={state.milestones}
             onClose={state.closeMetrics}
+            onOpenGlobalDay={handleOpenGlobalDay}
           />
         )}
       </div>

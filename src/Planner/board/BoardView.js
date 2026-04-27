@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import KanbanBoard from './KanbanBoard';
 import {
   getAllLeaves,
@@ -36,6 +36,7 @@ export default function BoardView({
   onOpenModal,
   onDeleteTask,
   onCreateTaskInSystem,
+  globalDayRequest, // {date: 'YYYY-MM-DD', ts: number} — Planner uses this to pop us into Global view scoped to one day
 }) {
   // ── Filter / view-mode state ──
   // Date range filter (default: today → today, disabled). When enabled, applies
@@ -48,7 +49,21 @@ export default function BoardView({
   // the date-range filter.
   const [globalView, setGlobalView] = useState(false);
 
-  const isActive = isSprintOverview || !!currentBoardId;
+  // External "open Global view scoped to date" requests (e.g. from Metrics).
+  const lastReqRef = useRef(null);
+  useEffect(() => {
+    if (!globalDayRequest) return;
+    if (globalDayRequest === lastReqRef.current) return;
+    lastReqRef.current = globalDayRequest;
+    setGlobalView(true);
+    setFilterEnabled(true);
+    setFilterStart(globalDayRequest.date);
+    setFilterEnd(globalDayRequest.date);
+  }, [globalDayRequest]);
+
+  // Including globalView lets BoardView render even when no underlying
+  // sprint/system board is active — needed for the metrics drill-in.
+  const isActive = isSprintOverview || !!currentBoardId || globalView;
 
   // Helper: apply current date filter to a list of leaves
   const applyFilter = (leaves) =>
@@ -255,7 +270,7 @@ export default function BoardView({
     return (
       <div className={`board-view${isActive ? ' active' : ''}`}>
         <div className="board-header">
-          <button className="board-back" onClick={onCloseBoard}>&#9664; Map</button>
+          <button className="board-back" onClick={() => { setGlobalView(false); onCloseBoard(); }}>&#9664; Map</button>
           <div className="board-title">&#127760; Global</div>
           <div style={{ width: 100 }} />
         </div>

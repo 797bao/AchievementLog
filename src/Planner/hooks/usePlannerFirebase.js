@@ -63,6 +63,7 @@ export default function usePlannerFirebase(isOwner) {
             milestones,
             taskOrder: val.taskOrder || {},
             activeMilestoneIdx: val.activeMilestoneIdx || 0,
+            sidebarWidth: typeof val.sidebarWidth === 'number' ? val.sidebarWidth : undefined,
           });
         }
         hasLoadedRef.current = true;
@@ -77,17 +78,19 @@ export default function usePlannerFirebase(isOwner) {
 
   /* Debounced save — 800ms after last change */
   const save = useCallback(
-    (milestones, taskOrder, activeMilestoneIdx) => {
+    (milestones, taskOrder, activeMilestoneIdx, sidebarWidth) => {
       if (!isOwner || !hasLoadedRef.current) return;
 
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(() => {
-        update(ref(database, 'planner'), {
+        const payload = {
           milestones,
           taskOrder,
           activeMilestoneIdx,
           lastUpdated: Date.now(),
-        }).catch((err) => {
+        };
+        if (typeof sidebarWidth === 'number') payload.sidebarWidth = sidebarWidth;
+        update(ref(database, 'planner'), payload).catch((err) => {
           console.error('Failed to save planner data:', err);
         });
       }, 800);

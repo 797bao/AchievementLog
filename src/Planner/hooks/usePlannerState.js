@@ -33,6 +33,11 @@ export default function usePlannerState(initialData) {
   const [taskOrder, setTaskOrder] = useState(
     () => (initialData && initialData.taskOrder) || {}
   );
+  // Persisted UI prefs (currently just sidebar width). Stored alongside
+  // milestones so it round-trips through Firebase.
+  const [sidebarWidth, setSidebarWidth] = useState(
+    () => (initialData && initialData.sidebarWidth) || 240
+  );
 
   /* ─── Undo / Redo history ─── */
   const MAX_HISTORY = 50;
@@ -1023,6 +1028,8 @@ export default function usePlannerState(initialData) {
     isMetricsView,
     msCollapsed,
     taskOrder,
+    sidebarWidth,
+    setSidebarWidth,
     allLeaves,
     allLeavesAllMilestones,
     mk,
