@@ -395,9 +395,11 @@ function App() {
 
   return (
     <div className="app">
-      <button className="hamburger" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle menu">
-        <span></span><span></span><span></span>
-      </button>
+      {activeSection !== 'planner' && (
+        <button className="hamburger" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle menu">
+          <span></span><span></span><span></span>
+        </button>
+      )}
       {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
       <nav className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-header">

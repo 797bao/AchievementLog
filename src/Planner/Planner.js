@@ -165,9 +165,28 @@ function PlannerInner({ initialData, onSave, onExit }) {
     });
   }, [state.milestones.length]);
 
+  // Mobile sidebar drawer state
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+  // Auto-close the drawer when the user picks a milestone / opens a board, so
+  // the canvas comes back into view on mobile.
+  const wrap = (fn) => (...args) => { closeSidebar(); return fn && fn(...args); };
+
   return (
     <div className="planner">
+      <button
+        className="planner-hamburger"
+        aria-label="Toggle planner menu"
+        onClick={() => setSidebarOpen((v) => !v)}
+      >
+        <span /><span /><span />
+      </button>
+      <div
+        className={`planner-sidebar-overlay${sidebarOpen ? ' open' : ''}`}
+        onClick={closeSidebar}
+      />
       <PlannerSidebar
+        sidebarOpen={sidebarOpen}
         onExit={onExit}
         milestones={state.milestones}
         activeMilestoneIdx={state.activeMilestoneIdx}
@@ -176,10 +195,10 @@ function PlannerInner({ initialData, onSave, onExit }) {
         isSprintOverview={state.isSprintOverview}
         isMetricsView={state.isMetricsView}
         msCollapsed={state.msCollapsed}
-        onSwitchMilestone={state.switchMilestone}
+        onSwitchMilestone={wrap(state.switchMilestone)}
         onChangeSidebarMonth={state.changeSidebarMonth}
-        onOpenSprintOverview={state.openSprintOverview}
-        onOpenMetrics={state.openMetrics}
+        onOpenSprintOverview={wrap(state.openSprintOverview)}
+        onOpenMetrics={wrap(state.openMetrics)}
         onToggleMilestones={state.toggleMilestones}
         onCreateMilestone={handleCreateMilestone}
         onRenameMilestone={handleRenameMilestone}

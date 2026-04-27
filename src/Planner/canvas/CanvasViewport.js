@@ -93,11 +93,22 @@ export default function CanvasViewport({
     endPan,
     isPanning,
     handleWheel,
+    zoomAtPoint,
     zoomAtCenter,
     resetView,
     transformStyle,
     zoomPercent,
   } = useCanvasPanZoom();
+
+  // Touch state
+  const touchRef = useRef({
+    longPressTimer: null,
+    startX: 0,
+    startY: 0,
+    moved: false,
+    pinch: null,           // { startDist, startZoom, midX, midY } when 2 fingers
+    longPressFired: false, // suppresses synthetic mousedown after long-press
+  });
 
   const handleMapClick = useCallback((state) => {
     // Arrow mode is handled directly in handleMouseDown so any element edge counts as a target
@@ -659,6 +670,162 @@ export default function CanvasViewport({
       window.removeEventListener('mouseup', handleMouseUp);
     };
   }, [handleMouseMove, handleMouseUp]);
+
+  // ─── Touch input → synthesised mouse events ───
+  // Strategy: a single touch is fed through the existing mouse pipeline as a
+  // left-button mousedown/mousemove/mouseup. A second touch flips the gesture
+  // into pinch-zoom and cancels the in-flight single-touch interaction. A
+  // long-press on a still finger fires a synthetic right-click contextmenu.
+  useEffect(() => {
+    const vp = vpRef.current;
+    if (!vp) return;
+
+    const LONG_PRESS_MS = 500;
+    const TAP_MOVE_TOLERANCE = 10; // px before a hold becomes a drag
+
+    const fakeEvent = (touch, button, target, base) => ({
+      button,
+      clientX: touch.clientX,
+      clientY: touch.clientY,
+      target: target || (base && base.target) || document.elementFromPoint(touch.clientX, touch.clientY),
+      shiftKey: !!(base && base.shiftKey),
+      ctrlKey: !!(base && base.ctrlKey),
+      metaKey: !!(base && base.metaKey),
+      preventDefault: () => { if (base && base.preventDefault) base.preventDefault(); },
+      stopPropagation: () => { if (base && base.stopPropagation) base.stopPropagation(); },
+    });
+
+    const distance = (t1, t2) => {
+      const dx = t2.clientX - t1.clientX;
+      const dy = t2.clientY - t1.clientY;
+      return Math.hypot(dx, dy);
+    };
+
+    const cancelLongPress = () => {
+      const tr = touchRef.current;
+      if (tr.longPressTimer) { clearTimeout(tr.longPressTimer); tr.longPressTimer = null; }
+    };
+
+    const onTouchStart = (e) => {
+      // 2-finger touch — pinch zoom
+      if (e.touches.length === 2) {
+        cancelLongPress();
+        // Cancel any in-flight single-touch interaction so it doesn't interfere
+        if (touchRef.current.activeSingle) {
+          handleMouseUp(fakeEvent(e.changedTouches[0], 0, null, e));
+          touchRef.current.activeSingle = false;
+        }
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        touchRef.current.pinch = {
+          startDist: distance(t1, t2),
+          startZoom: mapZoom,
+          midX: (t1.clientX + t2.clientX) / 2,
+          midY: (t1.clientY + t2.clientY) / 2,
+        };
+        e.preventDefault();
+        return;
+      }
+
+      if (e.touches.length !== 1) return;
+      const touch = e.touches[0];
+      touchRef.current.startX = touch.clientX;
+      touchRef.current.startY = touch.clientY;
+      touchRef.current.moved = false;
+      touchRef.current.longPressFired = false;
+      touchRef.current.activeSingle = true;
+
+      // Schedule long-press → synthetic right-click context menu.
+      touchRef.current.longPressTimer = setTimeout(() => {
+        if (touchRef.current.moved) return;
+        touchRef.current.longPressFired = true;
+        // First, end the in-flight "left mousedown" so we don't have a stuck drag
+        handleMouseUp(fakeEvent(touch, 0, null, e));
+        touchRef.current.activeSingle = false;
+        // Then fire the contextmenu via the existing handler
+        handleContextMenu(fakeEvent(touch, 2, null, e));
+      }, LONG_PRESS_MS);
+
+      // Begin a left-button mousedown immediately so dragging draggable
+      // elements works out of the box (the user's finger is already down).
+      handleMouseDown(fakeEvent(touch, 0, null, e));
+      e.preventDefault();
+    };
+
+    const onTouchMove = (e) => {
+      const tr = touchRef.current;
+
+      if (tr.pinch && e.touches.length >= 2) {
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        const newDist = distance(t1, t2);
+        const ratio = newDist / tr.pinch.startDist;
+        const targetZoom = Math.max(0.2, Math.min(3, tr.pinch.startZoom * ratio));
+        // We feed an absolute scale ratio relative to current zoom each frame,
+        // anchored at the original midpoint, so the math is stable.
+        const liveRatio = targetZoom / mapZoom;
+        if (Math.abs(liveRatio - 1) > 0.001 && vpRef.current) {
+          zoomAtPoint(liveRatio, tr.pinch.midX, tr.pinch.midY, vpRef.current.getBoundingClientRect());
+        }
+        e.preventDefault();
+        return;
+      }
+
+      if (e.touches.length !== 1 || tr.longPressFired) return;
+      const touch = e.touches[0];
+      const dx = touch.clientX - tr.startX;
+      const dy = touch.clientY - tr.startY;
+      if (!tr.moved && (Math.abs(dx) > TAP_MOVE_TOLERANCE || Math.abs(dy) > TAP_MOVE_TOLERANCE)) {
+        tr.moved = true;
+        cancelLongPress();
+      }
+      handleMouseMove(fakeEvent(touch, 0, null, e));
+      e.preventDefault();
+    };
+
+    const onTouchEnd = (e) => {
+      const tr = touchRef.current;
+      cancelLongPress();
+
+      if (tr.pinch && e.touches.length < 2) {
+        tr.pinch = null;
+        // If one finger is still down, restart a single-touch interaction
+        if (e.touches.length === 1) {
+          const touch = e.touches[0];
+          tr.startX = touch.clientX;
+          tr.startY = touch.clientY;
+          tr.moved = false;
+          tr.longPressFired = false;
+          tr.activeSingle = true;
+          handleMouseDown(fakeEvent(touch, 0, null, e));
+        }
+        return;
+      }
+
+      if (tr.longPressFired) { tr.longPressFired = false; tr.activeSingle = false; return; }
+      if (!tr.activeSingle) return;
+      tr.activeSingle = false;
+
+      const touch = e.changedTouches[0];
+      handleMouseUp(fakeEvent(touch, 0, null, e));
+    };
+
+    // touchmove must be non-passive so we can preventDefault to stop the page
+    // scrolling/zooming while the user is interacting with the canvas.
+    const opts = { passive: false };
+    vp.addEventListener('touchstart', onTouchStart, opts);
+    vp.addEventListener('touchmove', onTouchMove, opts);
+    vp.addEventListener('touchend', onTouchEnd, opts);
+    vp.addEventListener('touchcancel', onTouchEnd, opts);
+
+    return () => {
+      cancelLongPress();
+      vp.removeEventListener('touchstart', onTouchStart, opts);
+      vp.removeEventListener('touchmove', onTouchMove, opts);
+      vp.removeEventListener('touchend', onTouchEnd, opts);
+      vp.removeEventListener('touchcancel', onTouchEnd, opts);
+    };
+  }, [handleMouseDown, handleMouseMove, handleMouseUp, handleContextMenu, mapZoom, zoomAtPoint]);
 
   // ─── Keyboard: Ctrl+C, Ctrl+V, Delete, Escape ───
   useEffect(() => {

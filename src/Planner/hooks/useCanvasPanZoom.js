@@ -61,6 +61,25 @@ export default function useCanvasPanZoom() {
     });
   }, []);
 
+  /**
+   * Zoom around an arbitrary screen point by an absolute ratio.
+   * Used by pinch-gesture handlers — they compute the scale change from
+   * finger distance, not by accumulating deltas.
+   */
+  const zoomAtPoint = useCallback((scaleRatio, screenX, screenY, vpRect) => {
+    const mx = screenX - vpRect.left;
+    const my = screenY - vpRect.top;
+    setMapZoom((oldZoom) => {
+      const newZoom = Math.max(0.2, Math.min(3, oldZoom * scaleRatio));
+      const ratio = newZoom / oldZoom;
+      setMapPan((oldPan) => ({
+        x: mx - (mx - oldPan.x) * ratio,
+        y: my - (my - oldPan.y) * ratio,
+      }));
+      return newZoom;
+    });
+  }, []);
+
   const zoomAtCenter = useCallback((delta, vpRect) => {
     const cx = vpRect.width / 2;
     const cy = vpRect.height / 2;
@@ -92,6 +111,7 @@ export default function useCanvasPanZoom() {
     endPan,
     isPanning,
     handleWheel,
+    zoomAtPoint,
     zoomAtCenter,
     resetView,
     transformStyle,

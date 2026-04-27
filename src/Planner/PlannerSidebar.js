@@ -9,6 +9,7 @@ import {
 } from './plannerHelpers';
 
 export default function PlannerSidebar({
+  sidebarOpen,
   onExit,
   milestones,
   activeMilestoneIdx,
@@ -38,7 +39,7 @@ export default function PlannerSidebar({
   }, [msCtxMenu]);
 
   return (
-    <div className="planner-sidebar">
+    <div className={`planner-sidebar${sidebarOpen ? ' open' : ''}`}>
       {onExit && (
         <button className="planner-exit-btn" onClick={onExit} title="Back to main site">
           &#9664; Back to Main
