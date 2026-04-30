@@ -91,9 +91,13 @@ function niceMaxMinutes(val) {
 
 /* ─── Stacked Bar Chart (SVG) ─── */
 function BarChart({ data, onBarClick, emptyMessage, enabledTypes }) {
-  const [hoverIdx, setHoverIdx] = useState(null);
-  // Filter segments per bar by the enabledTypes set (if provided), then
-  // recompute totals and percentages so the visible totals reflect the filter.
+  // Tooltip state stores the hovered bar's screen rect so the tooltip can
+  // pin itself to viewport coordinates (`position: fixed`) instead of
+  // chart-local ones — needed because the chart on mobile is 3× viewport
+  // wide and scrolls horizontally inside its container.
+  const [hover, setHover] = useState(null); // { idx, rect }
+  const hoverIdx = hover ? hover.idx : null;
+  // Filter segments per bar by the enabledTypes set (if provided).
   const filteredData = useMemo(() => {
     if (!enabledTypes) return data;
     return data.map((d) => {
@@ -103,7 +107,6 @@ function BarChart({ data, onBarClick, emptyMessage, enabledTypes }) {
         ...s,
         pct: total > 0 ? (s.value / total) * 100 : 0,
       }));
-      // Daily bars carry a per-task list — filter that to enabled types too.
       const tasks = Array.isArray(d.tasks)
         ? d.tasks.filter((t) => enabledTypes.has(t.type))
         : d.tasks;
@@ -111,13 +114,36 @@ function BarChart({ data, onBarClick, emptyMessage, enabledTypes }) {
     });
   }, [data, enabledTypes]);
   data = filteredData;
-  // Track the container width so the chart fills it instead of being a fixed size.
+
+  // Track viewport breakpoint for mobile-specific sizing.
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mql = window.matchMedia('(max-width: 768px)');
+    const sync = () => setIsMobile(mql.matches);
+    sync();
+    if (mql.addEventListener) mql.addEventListener('change', sync);
+    else mql.addListener(sync);
+    return () => {
+      if (mql.removeEventListener) mql.removeEventListener('change', sync);
+      else mql.removeListener(sync);
+    };
+  }, []);
+
+  // Track the WRAP's width (NOT the bars SVG's). Putting the ref on the bars
+  // SVG creates a layout feedback loop: the SVG's width is set by chartW,
+  // but chartW is computed from the SVG's measured width — every render
+  // grows it by the trailing padding. Measuring the wrap (which is sized by
+  // its parent / min-width: 300vw on mobile) breaks the loop.
   const wrapRef = useRef(null);
   const [containerW, setContainerW] = useState(0);
   useLayoutEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
-    const update = () => setContainerW(el.clientWidth);
+    const update = () => {
+      const w = el.clientWidth;
+      // Skip identical reports — defensive against any residual jitter.
+      setContainerW((prev) => (prev === w ? prev : w));
+    };
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
@@ -126,81 +152,104 @@ function BarChart({ data, onBarClick, emptyMessage, enabledTypes }) {
 
   if (data.length === 0) return <div className="metrics-empty">{emptyMessage || 'No sprint data yet'}</div>;
 
-  // Daily view (>12 bars) is dense — narrow bars, no hover highlight,
-  // no per-bar value labels (too cramped to read).
+  // Daily view (>12 bars) is dense.
   const dense = data.length > 12;
   const rawMax = Math.max(...data.map((d) => d.value), 1);
   const maxVal = niceMaxMinutes(rawMax);
 
-  const chartH = 280;
+  // Mobile gets a taller chart (+~20%) and a tighter Y-axis gutter.
+  const chartH = isMobile ? 336 : 280;
   const labelH = 30;
   const topPad = 22;
-  const leftPad = 12;
-  const yAxisW = 52; // room for "12h 30m"-style hour labels on the left
+  const leftPad = isMobile ? 4 : 12;
+  const yAxisW = isMobile ? 34 : 52;
 
-  // Fit bars to container width: each bar's slot is (barW + gap), so
-  // barW = innerW / N - gap, clamped to a sane range.
-  const innerW = Math.max(0, containerW - yAxisW - leftPad - 12);
+  // Bar sizing — fit to the WRAP's width minus the Y-axis column. The
+  // trailing margin (24px) is large enough that yAxisW + chartW always
+  // stays strictly inside containerW — preventing the wrap from expanding
+  // to fit, which would feed back and grow the chart on every render.
+  const innerW = Math.max(0, containerW - yAxisW - leftPad - 24);
   const slot = data.length > 0 ? innerW / data.length : 50;
   const minBar = dense ? 6 : 18;
   const maxBar = dense ? 28 : 90;
   const barW = Math.max(minBar, Math.min(slot - (dense ? 4 : 8), maxBar));
   const gap = Math.max(2, slot - barW);
   const chartW = leftPad + data.length * (barW + gap) + 10;
-  const totalW = yAxisW + chartW;
+
+  // Pointer events for hover/tap on a bar. Captures the bar's screen rect
+  // so the tooltip can position itself in viewport coords.
+  const onEnterBar = (i, e) => {
+    if (data[i].value <= 0) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    setHover({ idx: i, rect });
+  };
+  const onLeaveBar = (i) => {
+    setHover((h) => (h && h.idx === i ? null : h));
+  };
+
+  const yTicks = [0, 0.25, 0.5, 0.75, 1];
 
   return (
     <div className="metrics-bar-wrap" ref={wrapRef}>
+      {/* Y-axis SVG — position: sticky in CSS so it stays put while the
+          bars container scrolls horizontally. Renders ONLY the labels. */}
       <svg
-        width={Math.max(totalW, 200)}
+        className="metrics-y-axis-svg"
+        width={yAxisW}
         height={chartH + labelH + topPad}
-        className="metrics-bar-svg"
       >
-        {/* Y-axis grid lines + hour labels */}
-        {[0, 0.25, 0.5, 0.75, 1].map((f) => {
+        {yTicks.map((f) => {
           const y = topPad + chartH * (1 - f);
           const minutes = Math.round(maxVal * f);
           return (
-            <g key={f}>
-              <line
-                x1={yAxisW}
-                x2={yAxisW + chartW}
-                y1={y}
-                y2={y}
-                stroke="#3c3f47"
-                strokeDasharray={f === 0 ? '0' : '4,4'}
-              />
-              <text
-                x={yAxisW - 6}
-                y={y + 3}
-                textAnchor="end"
-                fill="#5f6368"
-                fontSize={10}
-              >
-                {f === 0 ? '0' : formatTime(minutes)}
-              </text>
-            </g>
+            <text
+              key={f}
+              x={yAxisW - 4}
+              y={y + 3}
+              textAnchor="end"
+              fill="#5f6368"
+              fontSize={10}
+            >
+              {f === 0 ? '0' : formatTime(minutes)}
+            </text>
           );
         })}
+      </svg>
+
+      {/* Bars SVG — scrolls horizontally with the wrap. */}
+      <svg
+        className="metrics-bar-svg"
+        width={Math.max(chartW, 200)}
+        height={chartH + labelH + topPad}
+      >
+        {/* Horizontal grid lines (same Y positions as the Y-axis labels) */}
+        {yTicks.map((f) => (
+          <line
+            key={f}
+            x1={0}
+            x2={chartW}
+            y1={topPad + chartH * (1 - f)}
+            y2={topPad + chartH * (1 - f)}
+            stroke="#3c3f47"
+            strokeDasharray={f === 0 ? '0' : '4,4'}
+          />
+        ))}
 
         {data.map((d, i) => {
           const totalH = maxVal > 0 ? (d.value / maxVal) * chartH : 0;
-          const x = yAxisW + leftPad + i * (barW + gap);
+          const x = leftPad + i * (barW + gap);
           const isHover = hoverIdx === i;
           // Stack segments from the bottom up
           let yCursor = topPad + chartH;
           return (
             <g
               key={i}
-              // Empty bars don't participate in hover — hovering one shouldn't
-              // dim every other bar around it.
-              onMouseEnter={d.value > 0 ? () => setHoverIdx(i) : undefined}
-              onMouseLeave={d.value > 0 ? () => setHoverIdx((h) => (h === i ? null : h)) : undefined}
+              // Empty bars don't participate in hover.
+              onMouseEnter={d.value > 0 ? (e) => onEnterBar(i, e) : undefined}
+              onMouseLeave={d.value > 0 ? () => onLeaveBar(i) : undefined}
               onClick={onBarClick && d.value > 0 ? () => onBarClick(d) : undefined}
               style={{
                 cursor: onBarClick && d.value > 0 ? 'pointer' : 'default',
-                // No drop-shadow / glow — the opacity fade on the other bars
-                // already conveys focus. Cleaner, more "data-tool" looking.
               }}
             >
               {d.segments.map((seg, j) => {
@@ -287,15 +336,17 @@ function BarChart({ data, onBarClick, emptyMessage, enabledTypes }) {
                   {d.yearLabel}
                 </text>
               )}
-              {/* Invisible wide hit target so the user can hover the gap
-                  below the bar too. Only rendered for bars with data — empty
-                  days have no hit target so they don't capture hover events. */}
+              {/* A narrow hit-target rect spanning just the bar column —
+                  ensures empty space ABOVE the bar still triggers hover, but
+                  doesn't reach into neighbour-bar territory like the old
+                  wide rect did. (Touch users only register tooltips when
+                  they tap the bar itself, not the gap.) */}
               {d.value > 0 && (
                 <rect
-                  x={x - gap / 2}
-                  y={topPad}
-                  width={barW + gap}
-                  height={chartH + labelH}
+                  x={x}
+                  y={topPad + chartH - totalH}
+                  width={barW}
+                  height={totalH}
                   fill="transparent"
                   pointerEvents="all"
                 />
@@ -305,21 +356,12 @@ function BarChart({ data, onBarClick, emptyMessage, enabledTypes }) {
         })}
       </svg>
 
-      {/* Tooltip only shows in daily (dense) mode — monthly hours are inline
-          on the bar, so no tooltip is needed there. */}
-      {dense && hoverIdx !== null && data[hoverIdx] && data[hoverIdx].value > 0 && (
-        <BarTooltip
-          bar={data[hoverIdx]}
-          left={yAxisW + leftPad + hoverIdx * (barW + gap) + barW + 18}
-          top={topPad}
-          chartW={totalW}
-          idx={hoverIdx}
-          barW={barW}
-          gap={gap}
-          leftPad={yAxisW + leftPad}
-        />
+      {/* Tooltip only shows in daily (dense) mode. Position is FIXED in the
+          viewport, anchored to the hovered bar's screen rect, so the chart
+          can scroll horizontally without dragging the tooltip off-screen. */}
+      {dense && hover && data[hover.idx] && data[hover.idx].value > 0 && (
+        <BarTooltip bar={data[hover.idx]} barRect={hover.rect} />
       )}
-
     </div>
   );
 }
@@ -348,18 +390,35 @@ function CategoryLegend({ enabledTypes, onToggleType }) {
   );
 }
 
-function BarTooltip({ bar, left, top, chartW, idx, barW, gap, leftPad }) {
-  // If the tooltip would fall off the right edge, anchor to the LEFT of the bar instead.
+function BarTooltip({ bar, barRect }) {
   const isDaily = Array.isArray(bar.tasks);
   const TOOLTIP_W = isDaily ? 280 : 220;
-  const flipLeft = left + TOOLTIP_W > chartW;
-  const x = flipLeft
-    ? leftPad + idx * (barW + gap) - TOOLTIP_W - 18
-    : left;
+  // Compute viewport coordinates: prefer to the right of the bar; if that
+  // would clip the right edge, flip to the left; if both fail (e.g. a tall
+  // narrow viewport), clamp to the right edge.
+  const margin = 8;
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+  let left = barRect.right + 12;
+  if (left + TOOLTIP_W + margin > vw) {
+    // Try flipping to the LEFT of the bar
+    const flipped = barRect.left - TOOLTIP_W - 12;
+    left = flipped >= margin
+      ? flipped
+      : Math.max(margin, vw - TOOLTIP_W - margin);
+  }
+  // Vertically: try to align with the top of the bar, but keep it on screen.
+  let top = Math.max(margin, barRect.top);
+  // If the tooltip's likely height (~200px guess) would clip the bottom, shift up.
+  const tooltipHeightEst = 200;
+  if (top + tooltipHeightEst > vh - margin) {
+    top = Math.max(margin, vh - tooltipHeightEst - margin);
+  }
+
   return (
     <div
       className="metrics-tooltip"
-      style={{ left: Math.max(0, x), top, width: TOOLTIP_W }}
+      style={{ position: 'fixed', left, top, width: TOOLTIP_W }}
     >
       <div className="metrics-tt-title">{bar.label}</div>
       <div className="metrics-tt-total">Total: <strong>{formatTime(bar.value)}</strong></div>
@@ -553,6 +612,9 @@ export default function MetricsView({ milestones, onClose, onOpenGlobalDay }) {
       return next;
     });
   }, []);
+  // Mobile-only: filter UI lives in a slide-in drawer (the inline legend is
+  // hidden on small screens via CSS).
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
 
   const dailyData = useMemo(() => {
     if (!drilledMonth) return null;
@@ -643,6 +705,39 @@ export default function MetricsView({ milestones, onClose, onOpenGlobalDay }) {
         <div className="board-title">Metrics</div>
       </div>
 
+      {/* Mobile-only: floating filter button → opens the filter drawer */}
+      <button
+        className="metrics-filter-fab"
+        onClick={() => setFilterDrawerOpen(true)}
+        aria-label="Open filters"
+        title="Filter categories"
+      >
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <line x1="3" y1="5" x2="17" y2="5" />
+          <line x1="5" y1="10" x2="15" y2="10" />
+          <line x1="7" y1="15" x2="13" y2="15" />
+        </svg>
+      </button>
+
+      {/* Slide-in drawer that hosts the category filter on mobile */}
+      <div
+        className={`metrics-filter-drawer-overlay${filterDrawerOpen ? ' open' : ''}`}
+        onClick={() => setFilterDrawerOpen(false)}
+      />
+      <aside className={`metrics-filter-drawer${filterDrawerOpen ? ' open' : ''}`}>
+        <div className="metrics-filter-drawer-header">
+          <span>Filter Categories</span>
+          <button
+            className="metrics-filter-drawer-close"
+            onClick={() => setFilterDrawerOpen(false)}
+            aria-label="Close filters"
+          >&times;</button>
+        </div>
+        <div className="metrics-filter-drawer-content">
+          <CategoryLegend enabledTypes={enabledTypes} onToggleType={toggleType} />
+        </div>
+      </aside>
+
       {/* Summary cards row */}
       <div className="metrics-summary">
         <div className="metrics-card">
@@ -659,7 +754,7 @@ export default function MetricsView({ milestones, onClose, onOpenGlobalDay }) {
         </div>
         <div className="metrics-card">
           <div className="metrics-card-val">{metrics.totalLogged}</div>
-          <div className="metrics-card-label">Hours Logged</div>
+          <div className="metrics-card-label">Logged</div>
         </div>
         <div className="metrics-card">
           <div className="metrics-card-val">{metrics.totalExpected}</div>
