@@ -24,7 +24,12 @@ export default function usePlannerState(initialData) {
   const [activeMilestoneIdx, setActiveMilestoneIdx] = useState(
     () => (initialData && initialData.activeMilestoneIdx) || 0
   );
-  const [boardMonth, setBoardMonth] = useState({ year: 2026, month: 3 });
+  // Default the sprint month picker to the actual current month — was
+  // previously hard-coded to April 2026 from early development.
+  const [boardMonth, setBoardMonth] = useState(() => {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() };
+  });
   const [currentBoardId, setCurrentBoardId] = useState(null);
   const [currentBoardPath, setCurrentBoardPath] = useState(null);
   const [isSprintOverview, setIsSprintOverview] = useState(false);
