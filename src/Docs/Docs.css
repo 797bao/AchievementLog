@@ -1,0 +1,654 @@
+/* ═══════════════════════════════════════════════════
+   DESIGN DOCS — owner-only writing space
+   ═══════════════════════════════════════════════════ */
+
+.docs {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 100;
+  display: flex;
+  background: #1a1b1e;
+  color: #e8eaed;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+}
+
+.docs-loading {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  color: #9aa0a6; font-size: 14px;
+}
+
+/* ─── Left sidebar (doc list) ─── */
+.docs-sidebar {
+  width: 240px;             /* default; overridden inline once user resizes */
+  background: #22252b;
+  border-right: 1px solid #3c3f47;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow-y: auto;
+  position: relative;       /* anchor for the resize handle */
+}
+
+/* Drag handle on the right edge of the doc-list sidebar. Extends a few px
+   past the border so it's easy to grab. */
+.docs-sidebar-resize {
+  position: absolute;
+  top: 0; bottom: 0;
+  right: -3px;
+  width: 6px;
+  cursor: ew-resize;
+  background: transparent;
+  z-index: 20;
+  transition: background 0.12s;
+}
+.docs-sidebar-resize:hover,
+.docs-sidebar-resize:active {
+  background: rgba(232, 152, 90, 0.35);
+}
+
+.docs-exit-btn {
+  display: block;
+  width: calc(100% - 24px);
+  margin: 10px 12px;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid #3c3f47;
+  color: #9aa0a6;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  transition: all 0.15s;
+}
+.docs-exit-btn:hover { border-color: #E8985A; color: #E8985A; }
+
+.docs-sidebar-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px 8px;
+  border-bottom: 1px solid #2c2f38;
+}
+.docs-sidebar-title {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+  color: #5f6368; font-weight: 700;
+}
+.docs-new-btn {
+  background: rgba(232, 152, 90, 0.1);
+  border: 1px solid rgba(232, 152, 90, 0.35);
+  color: #E8985A;
+  font-size: 11px; font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.docs-new-btn:hover { background: rgba(232, 152, 90, 0.2); }
+
+.docs-list {
+  list-style: none; margin: 0; padding: 6px 8px;
+  flex: 1;
+}
+.docs-list-item {
+  position: relative;
+  padding: 8px 28px 8px 10px;
+  border-radius: 6px;
+  cursor: grab;            /* signal "draggable" */
+  margin-bottom: 2px;
+  transition: background 0.12s;
+}
+.docs-list-item:active { cursor: grabbing; }
+.docs-list-item:hover { background: rgba(255, 255, 255, 0.04); }
+.docs-list-item.active { background: rgba(232, 152, 90, 0.12); }
+.docs-list-item.active .docs-list-title { color: #E8985A; }
+
+/* Drag-drop states: dim the row being dragged, draw a 2px orange indicator
+   above/below the row that's currently the drop target (depending on whether
+   the cursor is in the row's top or bottom half). */
+.docs-list-item.dragging { opacity: 0.4; }
+.docs-list-item.drop-before::before,
+.docs-list-item.drop-after::after {
+  content: '';
+  position: absolute;
+  left: 4px; right: 4px;
+  height: 2px;
+  background: #E8985A;
+  border-radius: 2px;
+  pointer-events: none;
+}
+.docs-list-item.drop-before::before { top: -1px; }
+.docs-list-item.drop-after::after   { bottom: -1px; }
+
+.docs-list-title {
+  font-size: 13px; font-weight: 500;
+  color: #e8eaed;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.docs-list-meta {
+  font-size: 10px; color: #5f6368;
+  margin-top: 2px;
+}
+.docs-list-del {
+  position: absolute; top: 50%; right: 6px;
+  transform: translateY(-50%);
+  background: none; border: none;
+  color: #5f6368; cursor: pointer;
+  font-size: 18px; line-height: 1;
+  padding: 2px 4px;
+  opacity: 0; transition: opacity 0.12s, color 0.12s;
+}
+.docs-list-item:hover .docs-list-del { opacity: 1; }
+.docs-list-del:hover { color: #ea4335; }
+
+.docs-empty {
+  font-size: 12px; color: #5f6368; font-style: italic;
+  padding: 14px 10px;
+}
+
+/* ─── Main column (title + editor) ─── */
+.docs-main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 36px 60px 80px;
+  min-width: 0;
+}
+
+.docs-empty-state {
+  height: 100%;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  color: #5f6368;
+}
+.docs-empty-title { font-size: 16px; margin-bottom: 6px; color: #9aa0a6; }
+.docs-empty-sub { font-size: 13px; }
+.docs-empty-link {
+  background: none; border: none;
+  color: #E8985A; cursor: pointer;
+  margin: 0 4px;
+  font-size: inherit;
+  text-decoration: underline;
+}
+
+.docs-doc-header {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #3c3f47;
+}
+.docs-title-input {
+  flex: 1;
+  background: transparent;
+  border: none; outline: none;
+  color: #fff;
+  font-size: 32px;            /* matches Google Docs Title scale */
+  font-weight: 600;           /* semibold — Google Docs feel without being heavy */
+  letter-spacing: -0.3px;
+  line-height: 1.2;
+  font-family: inherit;
+  padding: 4px 0;
+}
+.docs-title-input::placeholder { color: #3c3f47; }
+
+.docs-save-indicator {
+  font-size: 11px;
+  color: #5f6368;
+  white-space: nowrap;
+  min-width: 56px;
+  text-align: right;
+}
+.docs-save-saving { color: #fbbc04; }
+.docs-save-saved { color: #34a853; }
+
+/* ─── Editor ─── */
+.doc-editor {
+  position: relative;
+}
+
+/* ─── Right-click context menu (replaces the persistent toolbar) ─── */
+.doc-context-menu {
+  position: fixed;
+  z-index: 200;
+  background: #22252b;
+  border: 1px solid #3c3f47;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  padding: 6px;
+  font-size: 13px;
+  user-select: none;
+}
+.doc-ctx-section {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #5f6368;
+  font-weight: 700;
+  padding: 6px 8px 4px;
+}
+.doc-ctx-sep {
+  height: 1px;
+  background: #3c3f47;
+  margin: 4px 0;
+}
+.doc-ctx-item {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 6px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  color: #e8eaed;
+  font-size: 12px;
+  text-align: left;
+  font-family: inherit;
+}
+.doc-ctx-item:hover { background: rgba(255, 255, 255, 0.05); }
+.doc-ctx-item.active { color: #E8985A; }
+.doc-ctx-item.active::before {
+  content: '✓';
+  position: absolute;
+  margin-left: -14px;
+  color: #E8985A;
+}
+.doc-ctx-item-kbd {
+  font-size: 10px;
+  color: #5f6368;
+  font-family: -apple-system, monospace;
+}
+
+/* Inline format row (B / I / </> / S) — square buttons */
+.doc-ctx-inline-row {
+  display: flex; gap: 4px;
+  padding: 2px 4px 6px;
+}
+.doc-ctx-inline {
+  background: transparent;
+  border: 1px solid #3c3f47;
+  color: #9aa0a6;
+  width: 30px; height: 28px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.doc-ctx-inline:hover { color: #e8eaed; border-color: #5f6368; }
+.doc-ctx-inline.active {
+  background: rgba(232, 152, 90, 0.15);
+  color: #E8985A;
+  border-color: rgba(232, 152, 90, 0.5);
+}
+
+/* ─── TipTap content ─── */
+.doc-editor-content {
+  font-size: 16px;
+  line-height: 1.2;              /* magazine-column tight */
+  color: #e8eaed;
+  max-width: 760px;
+}
+/* TipTap's editable wrapper */
+.doc-editor-content .ProseMirror {
+  outline: none;
+  min-height: 60vh;
+}
+/* Heading scale — conservative, modeled on Google Docs' built-in styles.
+   Each step is ~1.2–1.3× the next, so the hierarchy is clear without one
+   level dominating the page. Weights one notch lighter (600/600/500) than
+   the previous version — our system font stack at 700 was reading heavier
+   than Google's Arial-rendered defaults. */
+.doc-editor-content h1 {
+  font-size: 26px; font-weight: 600; line-height: 1.25;
+  letter-spacing: -0.2px;
+  margin: 28px 0 10px;
+  color: #fff;
+}
+.doc-editor-content h2 {
+  font-size: 20px; font-weight: 600; line-height: 1.3;
+  margin: 22px 0 8px;
+  color: #fff;
+}
+.doc-editor-content h3 {
+  font-size: 17px; font-weight: 500; line-height: 1.35;
+  margin: 18px 0 6px;
+  color: #c5c7cd;            /* slightly muted vs body so it doesn't fight body when sizes are close */
+}
+.doc-editor-content p {
+  margin: 0 0 6px;              /* was 14px — small gap so paragraphs flow line-by-line */
+}
+.doc-editor-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #5f6368;
+  pointer-events: none;
+  height: 0;
+}
+.doc-editor-content strong { color: #fff; font-weight: 700; }
+.doc-editor-content em { color: #e8eaed; }
+.doc-editor-content code {
+  background: #2c2f38;
+  border: 1px solid #3c3f47;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-size: 0.9em;
+  color: #E8985A;
+}
+.doc-editor-content pre {
+  background: #14151a;
+  border: 1px solid #2c2f38;
+  border-radius: 8px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  margin: 12px 0;
+}
+.doc-editor-content pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  color: #e8eaed;
+}
+.doc-editor-content blockquote {
+  border-left: 3px solid #E8985A;
+  padding: 4px 14px;
+  margin: 14px 0;
+  color: #b5b8be;
+  background: rgba(232, 152, 90, 0.04);
+  border-radius: 0 6px 6px 0;
+}
+.doc-editor-content blockquote p { margin: 6px 0; }
+.doc-editor-content ul, .doc-editor-content ol {
+  padding-left: 24px;
+  margin: 8px 0 14px;
+}
+.doc-editor-content li {
+  margin: 4px 0;
+}
+.doc-editor-content li > p { margin: 0; }
+
+/* The Indent extension adds inline `margin-left: <n*24>px` to blocks via the
+   `indent` attribute. Inside a list item the list itself already handles
+   indentation, so an inner block carrying its own indent ends up shifting
+   the text away from the bullet/number marker — the gap bug. Nullify it
+   for any block that lives directly under a list item (and nested lists). */
+.doc-editor-content li > p,
+.doc-editor-content li > h1,
+.doc-editor-content li > h2,
+.doc-editor-content li > h3,
+.doc-editor-content li > blockquote,
+.doc-editor-content li > ul,
+.doc-editor-content li > ol {
+  margin-left: 0 !important;
+}
+.doc-editor-content hr {
+  border: none;
+  border-top: 1px solid #3c3f47;
+  margin: 28px 0;
+}
+.doc-editor-content a, .doc-editor-content .doc-link {
+  color: #E8985A;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+/* ── Resizable image (custom NodeView) ───────────────────────────────
+   The wrap holds the image + its hover controls (alignment toolbar,
+   resize handle). Float-based alignment lets two images sit side-by-side
+   when both are set to align=left or right at sub-50% widths. */
+.doc-editor-content .doc-img-wrap {
+  position: relative;
+  display: inline-block;
+  margin: 14px 0;
+  max-width: 100%;
+  vertical-align: top;
+}
+.doc-editor-content .doc-img-wrap.doc-img-align-left {
+  float: left;
+  margin: 0 16px 8px 0;
+}
+.doc-editor-content .doc-img-wrap.doc-img-align-right {
+  float: right;
+  margin: 0 0 8px 16px;
+}
+.doc-editor-content .doc-img-wrap.doc-img-align-center {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+/* Clear floats so following blocks don't crowd into them. */
+.doc-editor-content h1,
+.doc-editor-content h2,
+.doc-editor-content h3,
+.doc-editor-content hr {
+  clear: both;
+}
+
+/* ── Video (custom NodeView) — same shape as the image wrap, swap <img> for
+   <video controls>. Two side-by-side videos via two .doc-vid-align-left. */
+.doc-editor-content .doc-vid-wrap {
+  position: relative;
+  display: inline-block;
+  margin: 14px 0;
+  max-width: 100%;
+  vertical-align: top;
+}
+.doc-editor-content .doc-vid-wrap.doc-vid-align-left {
+  float: left;
+  margin: 0 16px 8px 0;
+}
+.doc-editor-content .doc-vid-wrap.doc-vid-align-right {
+  float: right;
+  margin: 0 0 8px 16px;
+}
+.doc-editor-content .doc-vid-wrap.doc-vid-align-center {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+.doc-editor-content .doc-vid {
+  display: block;
+  max-width: 100%;
+  border-radius: 8px;
+  border: 1px solid #3c3f47;
+  background: #000;        /* placeholder colour while the first frame loads */
+  outline: none;
+}
+.doc-editor-content .doc-vid:hover {
+  border-color: #E8985A;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.doc-editor-content .doc-img {
+  display: block;
+  max-width: 100%;
+  border-radius: 8px;
+  border: 1px solid #3c3f47;
+  cursor: zoom-in;          /* hint: click to expand */
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.doc-editor-content .doc-img:hover {
+  border-color: #E8985A;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+/* Alignment toolbar — hover-revealed, top-right of the image. */
+.doc-img-controls {
+  position: absolute;
+  top: 6px; right: 6px;
+  display: flex; gap: 2px;
+  background: rgba(20, 21, 26, 0.85);
+  border: 1px solid rgba(60, 63, 71, 0.7);
+  border-radius: 6px;
+  padding: 3px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 5;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.doc-img-wrap:hover .doc-img-controls { opacity: 1; }
+
+.doc-img-ctrl {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #9aa0a6;
+  width: 26px; height: 22px;
+  font-size: 13px; line-height: 1;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+}
+.doc-img-ctrl:hover { color: #e8eaed; background: rgba(255, 255, 255, 0.06); }
+.doc-img-ctrl.active {
+  color: #E8985A;
+  background: rgba(232, 152, 90, 0.18);
+  border-color: rgba(232, 152, 90, 0.45);
+}
+
+/* Resize handle — hover-revealed, bottom-right corner. */
+.doc-img-resize {
+  position: absolute;
+  bottom: 4px; right: 4px;
+  width: 14px; height: 14px;
+  background: #E8985A;
+  border: 2px solid #fff;
+  border-radius: 3px;
+  cursor: nwse-resize;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 5;
+}
+.doc-img-wrap:hover .doc-img-resize { opacity: 0.9; }
+.doc-img-resize:hover { opacity: 1 !important; }
+
+/* ─── Lightbox ─── */
+.doc-lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  cursor: zoom-out;
+}
+.doc-lightbox-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 6px;
+  cursor: default;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+}
+.doc-lightbox-close {
+  position: fixed;
+  top: 16px; right: 16px;
+  width: 40px; height: 40px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border-radius: 8px;
+  font-size: 22px; line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.doc-lightbox-close:hover { background: rgba(0, 0, 0, 0.85); }
+.doc-lightbox-delete {
+  position: fixed;
+  top: 16px; left: 16px;
+  height: 40px;
+  padding: 0 14px;
+  background: rgba(234, 67, 53, 0.85);
+  border: 1px solid rgba(234, 67, 53, 1);
+  color: #fff;
+  border-radius: 8px;
+  font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.doc-lightbox-delete:hover { background: #c5362a; }
+.doc-editor-content .ProseMirror-focused img.ProseMirror-selectednode,
+.doc-editor-content img.ProseMirror-selectednode {
+  outline: 2px solid #E8985A;
+  outline-offset: 2px;
+}
+
+/* ─── TOC sits on the LEFT, between the doc-list sidebar and the editor ─── */
+.docs-toc {
+  width: 200px;             /* default; overridden inline once user resizes */
+  flex-shrink: 0;
+  background: #1d1f25;
+  border-right: 1px solid #2c2f38;
+  padding: 36px 18px 36px 18px;
+  overflow-y: auto;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  /* Sticky element is its own positioning context — handle is absolute against it. */
+}
+
+/* Drag handle on the right edge of the TOC. */
+.docs-toc-resize {
+  position: absolute;
+  top: 0; bottom: 0;
+  right: -3px;
+  width: 6px;
+  cursor: ew-resize;
+  background: transparent;
+  z-index: 20;
+  transition: background 0.12s;
+}
+.docs-toc-resize:hover,
+.docs-toc-resize:active {
+  background: rgba(232, 152, 90, 0.35);
+}
+.docs-toc-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #5f6368;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+.docs-toc-list {
+  list-style: none; padding: 0; margin: 0;
+}
+.docs-toc-item {
+  font-size: 12px;
+  color: #9aa0a6;
+  padding: 4px 0;
+  cursor: pointer;
+  line-height: 1.4;
+  border-left: 2px solid transparent;
+  padding-left: 8px;
+  margin-left: -8px;
+  transition: color 0.12s, border-color 0.12s;
+}
+.docs-toc-item:hover { color: #e8eaed; border-left-color: #3c3f47; }
+.docs-toc-h1 {
+  font-weight: 700;
+  font-size: 14px;          /* visibly larger than h2/h3 so the hierarchy reads */
+  color: #fff;
+  letter-spacing: 0.1px;
+  margin-top: 6px;
+}
+.docs-toc-h1:first-child { margin-top: 0; }
+.docs-toc-h2 { padding-left: 16px; margin-left: -8px; }
+.docs-toc-h3 { padding-left: 24px; margin-left: -8px; font-size: 11px; color: #5f6368; }
+.docs-toc-empty {
+  font-size: 11px;
+  color: #5f6368;
+  font-style: italic;
+}
+
+/* ─── Mobile ─── */
+@media (max-width: 768px) {
+  .docs-sidebar { width: 200px; }
+  .docs-main { padding: 18px 16px 60px; }
+  .docs-title-input { font-size: 24px; }
+  .docs-toc { display: none; }
+}

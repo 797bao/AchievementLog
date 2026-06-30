@@ -9,6 +9,7 @@ import ArtAchievements from './ArtAchievements';
 import Quests from './Quests';
 import Inbox from './Inbox';
 import Planner from './Planner/Planner';
+import Docs from './Docs/Docs';
 import ShapeIcon from './ShapeIcon';
 import './App.css';
 
@@ -46,10 +47,12 @@ const DEV_ITEMS = [
 // We use history.pushState (not a redirect / reload) so switching stays instant.
 const ROUTE_BASE = process.env.PUBLIC_URL || '';
 const PLANNER_ROUTE = ROUTE_BASE + '/planner';
+const DOCS_ROUTE = ROUTE_BASE + '/docs';
 function sectionFromPath(pathname) {
   // Case-insensitive so /Planner, /PLANNER, /planner all work.
   const p = (pathname || '').toLowerCase().replace(/\/+$/, ''); // strip trailing slashes
   if (p === PLANNER_ROUTE.toLowerCase()) return 'planner';
+  if (p === DOCS_ROUTE.toLowerCase()) return 'docs';
   return null;
 }
 
@@ -74,7 +77,11 @@ function App() {
   // Push a new history entry whenever the planner opens/closes, and listen
   // for browser back/forward to keep the section in sync with the URL.
   useEffect(() => {
-    const target = activeSection === 'planner' ? PLANNER_ROUTE : ROUTE_BASE + '/';
+    const target = activeSection === 'planner'
+      ? PLANNER_ROUTE
+      : activeSection === 'docs'
+        ? DOCS_ROUTE
+        : ROUTE_BASE + '/';
     if (window.location.pathname !== target) {
       window.history.pushState(null, '', target + window.location.search + window.location.hash);
     }
@@ -555,6 +562,17 @@ function App() {
               <span className="nav-label">Planner</span>
             </li>
           )}
+
+          {/* Docs — owner only design journal */}
+          {isOwner && (
+            <li
+              className={`nav-item ${activeSection === 'docs' ? 'active' : ''}`}
+              onClick={() => setActiveSection('docs')}
+            >
+              <span className="nav-icon" style={{ fontSize: '15px' }}>&#9998;</span>
+              <span className="nav-label">Docs</span>
+            </li>
+          )}
         </ul>
         <div className="sidebar-footer">
           {authReady && !user && (
@@ -627,6 +645,11 @@ function App() {
         authReady
           ? <Planner key={user ? user.uid : 'anon'} isOwner={isOwner} onExit={() => setActiveSection('inbox')} />
           : <div className="planner"><div className="planner-loading">Loading planner&hellip;</div></div>
+      )}
+      {activeSection === 'docs' && (
+        authReady
+          ? <Docs key={user ? user.uid : 'anon'} isOwner={isOwner} onExit={() => setActiveSection('inbox')} />
+          : <div className="docs"><div className="docs-loading">Loading docs&hellip;</div></div>
       )}
     </div>
   );
