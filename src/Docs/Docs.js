@@ -47,6 +47,10 @@ function DocsInner({ isOwner, onExit }) {
   useEffect(() => { try { window.localStorage.setItem(LS_LIST_W, String(listW)); } catch (e) {} }, [listW]);
   useEffect(() => { try { window.localStorage.setItem(LS_TOC_W,  String(tocW));  } catch (e) {} }, [tocW]);
 
+  // Mobile drawer state — sidebar slides off-canvas on small screens.
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+
   // Auto-select the most recently updated doc once loaded (if any). If none
   // exist, leave it null — the editor area shows an empty state.
   useEffect(() => {
@@ -76,10 +80,17 @@ function DocsInner({ isOwner, onExit }) {
     setTimeout(() => setSaveState('saved'), 800);
   }, [activeDocId, saveDoc]);
 
+  // Select-a-doc helper that also closes the mobile drawer so the editor
+  // becomes visible immediately after picking on a phone.
+  const selectDoc = useCallback((id) => {
+    setActiveDocId(id);
+    closeSidebar();
+  }, [closeSidebar]);
+
   const handleNew = useCallback(() => {
     const id = createDoc();
-    if (id) setActiveDocId(id);
-  }, [createDoc]);
+    if (id) selectDoc(id);
+  }, [createDoc, selectDoc]);
 
   const handleDelete = useCallback((docId) => {
     deleteDoc(docId);
@@ -115,11 +126,31 @@ function DocsInner({ isOwner, onExit }) {
 
   return (
     <div className="docs">
+      {/* Doc-picker button — only visible on mobile via CSS media query.
+          Sits top-right so it doesn't collide with the main-app hamburger
+          (top-left). Labeled "Docs" so users know this opens the doc list,
+          not the section switcher. */}
+      <button
+        className="docs-hamburger"
+        aria-label="Toggle doc list"
+        onClick={() => setSidebarOpen((v) => !v)}
+      >
+        <span className="docs-hamburger-lines">
+          <span /><span /><span />
+        </span>
+        <span>Docs</span>
+      </button>
+      {/* Backdrop that closes the drawer on tap — only rendered when open. */}
+      <div
+        className={`docs-sidebar-overlay${sidebarOpen ? ' open' : ''}`}
+        onClick={closeSidebar}
+      />
+
       <DocsSidebar
         docs={docs}
         docsOrder={docsOrder}
         activeDocId={activeDocId}
-        onSelect={setActiveDocId}
+        onSelect={selectDoc}
         onNew={handleNew}
         onDelete={handleDelete}
         onReorder={reorderDocs}
@@ -128,6 +159,7 @@ function DocsInner({ isOwner, onExit }) {
         onResize={setListW}
         minWidth={MIN_LIST_W}
         maxWidth={MAX_LIST_W}
+        sidebarOpen={sidebarOpen}
       />
 
       {/* TOC sits between the sidebar and main editor on the LEFT */}

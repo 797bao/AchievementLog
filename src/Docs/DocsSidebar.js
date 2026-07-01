@@ -9,6 +9,7 @@ import React, { useMemo, useState } from 'react';
 export default function DocsSidebar({
   docs, docsOrder, activeDocId, onSelect, onNew, onExit, onDelete, onReorder,
   width, onResize, minWidth = 180, maxWidth = 420,
+  sidebarOpen,  // mobile drawer state — toggles the `open` class
 }) {
   // Compute the visible list:
   //   1) docs that appear in docsOrder, in that order
@@ -88,7 +89,7 @@ export default function DocsSidebar({
   const onDragEnd = () => { setDraggingId(null); setDropTarget(null); };
 
   return (
-    <aside className="docs-sidebar" style={width ? { width } : undefined}>
+    <aside className={`docs-sidebar${sidebarOpen ? ' open' : ''}`} style={width ? { width } : undefined}>
       {onExit && (
         <button className="docs-exit-btn" onClick={onExit} title="Back to main site">
           &#9664; Back to Main
