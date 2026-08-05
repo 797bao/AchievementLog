@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import './Docs.css';
 import useDocsFirebase from './hooks/useDocsFirebase';
+import useLogFirebase from './hooks/useLogFirebase';
 import DocsSidebar from './DocsSidebar';
 import DocEditor from './DocEditor';
 import DocToc from './DocToc';
+import { LogRail, LogDayPage, todayKey } from './LogView';
 import { uploadDocImage } from './helpers/imageUpload';
 import { uploadDocVideo } from './helpers/videoUpload';
 
@@ -38,7 +40,39 @@ function readStoredW(key, fallback, min, max) {
 
 function DocsInner({ isOwner, onExit }) {
   const { docs, docsOrder, isLoading, createDoc, saveDoc, deleteDoc, reorderDocs } = useDocsFirebase(isOwner);
+  const { entries: logEntries, saveDay: saveLogDay } = useLogFirebase(isOwner);
   const [activeDocId, setActiveDocId] = useState(null);
+  // Structured Log view: null = normal docs, a 'YYYY-MM-DD' string = that
+  // day's template page (the month/day rail stays visible alongside it).
+  // Deep link: opening .../docs#log lands on TODAY's page — the date is
+  // computed at load time, so a bookmarked link always follows the calendar.
+  const [logView, setLogView] = useState(
+    () => (window.location.hash.toLowerCase() === '#log' ? todayKey() : null)
+  );
+
+  // Keep the hash in sync so the address bar is always bookmarkable:
+  // any log page shows #log; leaving the log clears it. replaceState avoids
+  // polluting browser history with every day switch (and doesn't fire
+  // hashchange, so it can't loop with the listener below).
+  useEffect(() => {
+    const { pathname, search, hash } = window.location;
+    const want = logView ? '#log' : '';
+    if (hash !== want) {
+      window.history.replaceState(null, '', pathname + search + want);
+    }
+  }, [logView]);
+
+  // Typing #log into the address bar of an ALREADY-OPEN tab doesn't reload
+  // the page — it only fires hashchange. Catch it and jump to today.
+  useEffect(() => {
+    const onHash = () => {
+      if (window.location.hash.toLowerCase() === '#log') {
+        setLogView(todayKey());
+      }
+    };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
   const [saveState, setSaveState] = useState('idle'); // idle | saving | saved
 
   // Resizable rail widths.
@@ -84,8 +118,21 @@ function DocsInner({ isOwner, onExit }) {
   // becomes visible immediately after picking on a phone.
   const selectDoc = useCallback((id) => {
     setActiveDocId(id);
+    setLogView(null);
     closeSidebar();
   }, [closeSidebar]);
+
+  // Clicking Log lands straight on today's page.
+  const openLog = useCallback(() => {
+    setLogView(todayKey());
+    closeSidebar();
+  }, [closeSidebar]);
+
+  const handleLogChange = useCallback((dateKey, patch) => {
+    setSaveState('saving');
+    saveLogDay(dateKey, patch);
+    setTimeout(() => setSaveState('saved'), 800);
+  }, [saveLogDay]);
 
   const handleNew = useCallback(() => {
     const id = createDoc();
@@ -149,7 +196,7 @@ function DocsInner({ isOwner, onExit }) {
       <DocsSidebar
         docs={docs}
         docsOrder={docsOrder}
-        activeDocId={activeDocId}
+        activeDocId={logView ? null : activeDocId}
         onSelect={selectDoc}
         onNew={handleNew}
         onDelete={handleDelete}
@@ -160,10 +207,20 @@ function DocsInner({ isOwner, onExit }) {
         minWidth={MIN_LIST_W}
         maxWidth={MAX_LIST_W}
         sidebarOpen={sidebarOpen}
+        logActive={logView !== null}
+        onOpenLog={openLog}
       />
 
-      {/* TOC sits between the sidebar and main editor on the LEFT */}
-      {activeDoc && (
+      {/* TOC sits between the sidebar and main editor on the LEFT.
+          In Log mode, the month/day rail takes its place. */}
+      {logView && (
+        <LogRail
+          entries={logEntries}
+          selectedDay={logView}
+          onSelectDay={(d) => setLogView(d)}
+        />
+      )}
+      {!logView && activeDoc && (
         <DocToc
           content={activeDoc.content}
           width={tocW}
@@ -174,7 +231,22 @@ function DocsInner({ isOwner, onExit }) {
       )}
 
       <main className="docs-main">
-        {!activeDoc && (
+        {logView && (
+          <>
+            <div className="docs-doc-header log-day-header">
+              <div className={`docs-save-indicator docs-save-${saveState}`}>
+                {saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved' : ''}
+              </div>
+            </div>
+            <LogDayPage
+              dateKey={logView}
+              entry={logEntries[logView]}
+              onChange={handleLogChange}
+            />
+          </>
+        )}
+
+        {!logView && !activeDoc && (
           <div className="docs-empty-state">
             <div className="docs-empty-title">No doc selected</div>
             <div className="docs-empty-sub">
@@ -184,7 +256,7 @@ function DocsInner({ isOwner, onExit }) {
           </div>
         )}
 
-        {activeDoc && (
+        {!logView && activeDoc && (
           <>
             <div className="docs-doc-header">
               <input

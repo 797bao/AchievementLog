@@ -744,3 +744,203 @@
      down so the top-right doc-picker button doesn't cover it. */
   .docs-sidebar { padding-top: 44px; }
 }
+
+/* ═══ Structured daily Log ═══ */
+
+/* Pinned sidebar entry above the free-form doc list */
+.docs-log-entry {
+  display: flex; align-items: center; gap: 8px;
+  width: calc(100% - 16px);
+  margin: 6px 8px 2px;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: #e8eaed;
+  font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s;
+}
+.docs-log-entry:hover { background: rgba(255, 255, 255, 0.04); }
+.docs-log-entry.active { background: rgba(232, 152, 90, 0.12); color: #E8985A; }
+.docs-log-icon { font-size: 14px; }
+
+/* ── Rail: always-visible month/day tree (sits in the TOC slot) ── */
+.log-rail {
+  width: 220px;
+  flex-shrink: 0;
+  background: #1e2025;
+  border-right: 1px solid #2c2f38;
+  overflow-y: auto;
+  padding: 14px 8px 24px;
+}
+.log-rail-title {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+  color: #5f6368; font-weight: 700;
+  padding: 0 10px 10px;
+}
+
+.log-month { margin-bottom: 4px; }
+.log-month-header {
+  display: flex; align-items: center; gap: 6px;
+  width: 100%;
+  padding: 6px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: #e8eaed;
+  font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s;
+}
+.log-month-header:hover { background: rgba(255, 255, 255, 0.04); }
+.log-month-chevron {
+  font-size: 10px; color: #5f6368;
+  transition: transform 0.15s;
+}
+.log-month-chevron.open { transform: rotate(90deg); }
+.log-month-label { flex: 1; }
+.log-month-count { font-size: 11px; color: #5f6368; font-weight: 500; }
+
+.log-day-list {
+  list-style: none;
+  margin: 2px 0 8px;
+  padding: 0 0 0 14px;
+}
+.log-day-row {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%;
+  padding: 5px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: #9aa0a6;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s, color 0.12s;
+}
+.log-day-row:hover { background: rgba(255, 255, 255, 0.04); color: #e8eaed; }
+.log-day-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #3c3f47;
+  flex-shrink: 0;
+}
+/* Green dot + green text = day has logged content. Logged state ONLY —
+   selection and "today" never color the dot, so an empty today stays blank. */
+.log-day-row.filled { color: #5cd99a; }
+.log-day-row.filled .log-day-dot { background: #5cd99a; }
+/* Selected day — the page currently open in the editor area */
+.log-day-row.selected {
+  background: rgba(232, 152, 90, 0.12);
+  color: #E8985A;
+}
+/* ...but once a day is logged, green wins over the orange selection accent */
+.log-day-row.selected.filled {
+  background: rgba(92, 217, 154, 0.12);
+  color: #5cd99a;
+}
+/* Today gets an accent even when not selected (unless logged — green wins) */
+.log-day-row.today:not(.selected):not(.filled) { color: #e8eaed; font-weight: 600; }
+.log-day-row.filled .log-day-today {
+  color: #5cd99a;
+  border-color: rgba(92, 217, 154, 0.35);
+}
+/* Future days — visible for planning ahead, but visually receded */
+.log-day-row.future { opacity: 0.45; }
+.log-day-row.future:hover { opacity: 0.8; }
+.log-day-today {
+  font-size: 9px; font-weight: 600;
+  color: #E8985A;
+  border: 1px solid rgba(232, 152, 90, 0.35);
+  border-radius: 4px;
+  padding: 0 4px;
+  margin-left: auto;
+}
+
+/* ── Day page: fixed template ── */
+.log-day-page {
+  max-width: 640px;
+  margin: 0 auto;
+}
+.log-day-title {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 32px; font-weight: 600;
+  margin: 0 0 18px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #3c3f47;
+}
+.log-title-badge {
+  font-size: 11px; font-weight: 600;
+  color: #E8985A;
+  border: 1px solid rgba(232, 152, 90, 0.35);
+  border-radius: 5px;
+  padding: 2px 8px;
+}
+.log-title-badge.future {
+  color: #9aa0a6;
+  border-color: #3c3f47;
+}
+.log-day-header { min-height: 0; }
+
+.log-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.log-field-label {
+  display: flex; align-items: center; gap: 7px;
+  flex-shrink: 0;
+  width: 150px;
+  padding: 5px 8px 4px;
+  font-size: 13px; font-weight: 600;
+  color: #9aa0a6;
+  border-radius: 6px;
+}
+.log-field-icon { font-size: 13px; }
+/* Text-glyph icons (e.g. the </> for Core Mechanics) read best in mono bold */
+.log-field-icon.code {
+  font-family: 'Consolas', 'Menlo', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+/* Planned is a plain label — brighter than tag text but uncolored */
+.log-field-planned .log-field-label {
+  color: #e8eaed;
+  padding-left: 0;
+}
+/* Tag chips: pill shape; tint/border/text color come inline from the
+   tag's accent color so each classifier is visually distinct. */
+.log-field-tag {
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+}
+.log-field-divider {
+  height: 1px;
+  background: #2c2f38;
+  margin: 14px 0;
+}
+.log-field-input {
+  flex: 1;
+  resize: none;
+  overflow: hidden;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid #2c2f38;
+  color: #e8eaed;
+  font-size: 14px;
+  line-height: 1.4;
+  padding: 6px 2px;
+  font-family: inherit;
+}
+.log-field-input:focus {
+  outline: none;
+  border-bottom-color: rgba(232, 152, 90, 0.5);
+}
+.log-field-input::placeholder { color: #3c3f47; }

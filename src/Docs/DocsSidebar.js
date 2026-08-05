@@ -10,6 +10,8 @@ export default function DocsSidebar({
   docs, docsOrder, activeDocId, onSelect, onNew, onExit, onDelete, onReorder,
   width, onResize, minWidth = 180, maxWidth = 420,
   sidebarOpen,  // mobile drawer state — toggles the `open` class
+  logActive,    // structured Log view is open
+  onOpenLog,
 }) {
   // Compute the visible list:
   //   1) docs that appear in docsOrder, in that order
@@ -93,6 +95,17 @@ export default function DocsSidebar({
       {onExit && (
         <button className="docs-exit-btn" onClick={onExit} title="Back to main site">
           &#9664; Back to Main
+        </button>
+      )}
+
+      {/* Pinned structured Log — always on top, not draggable or deletable. */}
+      {onOpenLog && (
+        <button
+          className={`docs-log-entry${logActive ? ' active' : ''}`}
+          onClick={onOpenLog}
+        >
+          <span className="docs-log-icon">&#x1F4C6;</span>
+          <span>Log</span>
         </button>
       )}
 
