@@ -86,7 +86,7 @@ const tagChipStyle = (color) => ({
 
 /* ─── Left rail: always-visible month/day tree ─── */
 
-export function LogRail({ entries, selectedDay, onSelectDay }) {
+export function LogRail({ entries, selectedDay, onSelectDay, open }) {
   const months = useMemo(buildMonths, []);
   // Current (first) month expanded; older months collapsed by default.
   const [collapsed, setCollapsed] = useState(() =>
@@ -104,7 +104,7 @@ export function LogRail({ entries, selectedDay, onSelectDay }) {
   }, []);
 
   return (
-    <aside className="log-rail">
+    <aside className={`log-rail${open ? ' open' : ''}`}>
       <div className="log-rail-title">Log</div>
       {months.map(({ monthKey, label, days }) => {
         const isOpen = !collapsed.has(monthKey);

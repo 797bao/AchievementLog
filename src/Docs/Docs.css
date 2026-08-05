@@ -944,3 +944,59 @@
   border-bottom-color: rgba(232, 152, 90, 0.5);
 }
 .log-field-input::placeholder { color: #3c3f47; }
+
+/* ── Log on mobile: rail becomes an off-canvas drawer ── */
+
+/* Toggle button — sits to the right of the main-app hamburger (top-left).
+   Hidden on desktop. */
+.log-rail-toggle {
+  display: none;
+  position: fixed;
+  top: 12px; left: 64px;
+  z-index: 1200;
+  background: rgba(44, 47, 56, 0.55);
+  border: 1px solid rgba(60, 63, 71, 0.6);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 15px;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.log-rail-overlay { display: none; }
+
+@media (max-width: 768px) {
+  .log-rail-toggle { display: block; }
+
+  .log-rail {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    width: 240px;
+    z-index: 1100;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    border-right: 1px solid #3c3f47;
+    padding-top: 52px;   /* clear the fixed top buttons */
+  }
+  .log-rail.open { transform: translateX(0); }
+
+  .log-rail-overlay.open {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 1050;
+    background: rgba(0, 0, 0, 0.5);
+  }
+
+  /* Day page: smaller title, stacked label-above-input fields so the
+     inputs get the full width. */
+  .log-day-title { font-size: 22px; gap: 8px; }
+  .log-field {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    margin-bottom: 14px;
+  }
+  .log-field-label { width: fit-content; }
+  .log-field-input { width: 100%; }
+}

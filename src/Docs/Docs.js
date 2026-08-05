@@ -84,6 +84,9 @@ function DocsInner({ isOwner, onExit }) {
   // Mobile drawer state — sidebar slides off-canvas on small screens.
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+  // Same pattern for the Log's month/day rail on mobile.
+  const [railOpen, setRailOpen] = useState(false);
+  const closeRail = useCallback(() => setRailOpen(false), []);
 
   // Auto-select the most recently updated doc once loaded (if any). If none
   // exist, leave it null — the editor area shows an empty state.
@@ -214,11 +217,27 @@ function DocsInner({ isOwner, onExit }) {
       {/* TOC sits between the sidebar and main editor on the LEFT.
           In Log mode, the month/day rail takes its place. */}
       {logView && (
-        <LogRail
-          entries={logEntries}
-          selectedDay={logView}
-          onSelectDay={(d) => setLogView(d)}
-        />
+        <>
+          {/* Mobile-only toggle for the rail — sits next to the main-app
+              hamburger. Hidden on desktop via CSS. */}
+          <button
+            className="log-rail-toggle"
+            aria-label="Toggle log calendar"
+            onClick={() => setRailOpen((v) => !v)}
+          >
+            &#x1F4C6;
+          </button>
+          <div
+            className={`log-rail-overlay${railOpen ? ' open' : ''}`}
+            onClick={closeRail}
+          />
+          <LogRail
+            entries={logEntries}
+            selectedDay={logView}
+            onSelectDay={(d) => { setLogView(d); closeRail(); }}
+            open={railOpen}
+          />
+        </>
       )}
       {!logView && activeDoc && (
         <DocToc
