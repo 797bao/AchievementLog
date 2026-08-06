@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ref, onValue, set as fbSet, remove } from 'firebase/database';
+import { ref, onValue, set as fbSet, remove, get } from 'firebase/database';
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { database, auth, googleProvider } from './firebase';
 import CardioAchievements from './CardioAchievements';
@@ -110,6 +110,41 @@ function App() {
 
   const OWNER_UID = 'G6LOOmF0nfQl8IeMeLGIDzEptYj1';
   const isOwner = !!user && user.uid === OWNER_UID;
+
+  // ── GameDevHours mirror ──
+  // The gantt pipeline writes per-activity hours to /dailyTotals, which is
+  // PRIVATE (it includes Work hours). The public dev achievements read the
+  // gamedev-only mirror at /GameDevHours. Whenever the owner loads the app,
+  // re-derive the mirror so achievements stay current for public visitors.
+  useEffect(() => {
+    if (!isOwner) return;
+    let cancelled = false;
+    Promise.all([
+      get(ref(database, 'dailyTotals')),
+      get(ref(database, 'GameDevHours')),
+    ])
+      .then(([dtSnap, mirrorSnap]) => {
+        if (cancelled) return;
+        const dt = dtSnap.val() || {};
+        const mirror = mirrorSnap.val() || {};
+        const next = {};
+        for (const [date, acts] of Object.entries(dt)) {
+          if (acts && typeof acts.GameDev === 'number' && acts.GameDev > 0) {
+            next[date] = acts.GameDev;
+          }
+        }
+        const changed =
+          Object.keys(next).length !== Object.keys(mirror).length ||
+          Object.entries(next).some(([d, h]) => mirror[d] !== h);
+        if (changed) {
+          fbSet(ref(database, 'GameDevHours'), next).catch((e) =>
+            console.error('GameDevHours mirror sync failed:', e)
+          );
+        }
+      })
+      .catch((e) => console.error('GameDevHours mirror check failed:', e));
+    return () => { cancelled = true; };
+  }, [isOwner]);
 
   // ── Data for sidebar counts ──
   const [strengthAchievements, setStrengthAchievements] = useState([]);
