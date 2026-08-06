@@ -60,10 +60,11 @@ function dayTitle(key) {
   return `${MONTH_NAMES[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
 }
 
-/** True when the entry has any text in planned or a tag field. */
+/** True when the entry has text in any TAG field. Planned deliberately
+ *  doesn't count — writing tomorrow's plan isn't logging the day; only an
+ *  actual recap marks it green. */
 function hasContent(entry) {
   if (!entry) return false;
-  if (entry.planned && entry.planned.trim()) return true;
   return LOG_TAGS.some(({ key }) => entry[key] && entry[key].trim());
 }
 
