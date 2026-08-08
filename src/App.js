@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ref, onValue, set as fbSet, remove, get } from 'firebase/database';
-import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
+import { onAuthStateChanged, signInWithPopup, signInWithCustomToken, signOut } from 'firebase/auth';
 import { database, auth, googleProvider } from './firebase';
 import CardioAchievements from './CardioAchievements';
 import StrengthAchievements from './StrengthAchievements';
@@ -103,6 +103,21 @@ function App() {
       setAuthReady(true);
     });
     return unsub;
+  }, []);
+
+  // Widget WebView auto-auth: Google's OAuth popup is blocked inside Android
+  // WebViews, so the MyStats app appends ?authToken=<owner custom JWT> and we
+  // sign in with it directly. Firebase persistence keeps the session after.
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.search).get('authToken');
+    if (token) {
+      signInWithCustomToken(auth, token)
+        .catch(console.error)
+        .finally(() => {
+          // Strip the token from the visible URL, keep the route + anchor
+          window.history.replaceState(null, '', window.location.pathname + window.location.hash);
+        });
+    }
   }, []);
 
   const handleSignIn = () => signInWithPopup(auth, googleProvider).catch(console.error);
