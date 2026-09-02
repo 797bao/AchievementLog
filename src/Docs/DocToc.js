@@ -54,7 +54,7 @@ export default function DocToc({
     const matches = editorRoot.querySelectorAll(`h${h.level}`);
     let nth = 0;
     for (const el of matches) {
-      if ((el.textContent || '').trim() === h.text) {
+      if (normText(el.textContent) === h.text) {
         if (nth === h.idx) {
           el.scrollIntoView({ behavior: 'smooth', block: 'start' });
           return;
@@ -96,7 +96,7 @@ function extractHeadings(content) {
     if (!node) return;
     if (node.type === 'heading') {
       const level = (node.attrs && node.attrs.level) || 1;
-      const text = collectText(node);
+      const text = normText(collectText(node));
       const key = `${level}:${text}`;
       const idx = seenCount[key] || 0;
       seenCount[key] = idx + 1;
@@ -108,6 +108,18 @@ function extractHeadings(content) {
   };
   walk(content);
   return out;
+}
+
+/**
+ * Both sides of the match have to be normalised the SAME way. The DOM side was
+ * trimmed and the JSON side was not, so a heading authored as "Goal: " never
+ * matched the "Goal:" the browser reports and clicking it did nothing at all.
+ * Worse, idx was counted on the raw text while the DOM was counted on the
+ * trimmed text, so "Result: " and "Result:" were two different keys over one
+ * set of elements and every later entry pointed one heading too high.
+ */
+function normText(s) {
+  return (s || '').replace(/\s+/g, ' ').trim();
 }
 
 function collectText(node) {
