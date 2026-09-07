@@ -423,6 +423,75 @@
   clear: both;
 }
 
+/* ── Tables (TipTap Table, resizable) ─────────────────────────────────
+   The <div class="tableWrapper"> comes from prosemirror-tables' column-resize
+   view, NOT from TipTap's renderer (with resizable:true TipTap registers no
+   NodeView of its own), so the table rules select the <table> element
+   directly and only the overflow rule depends on the wrapper. No class lands
+   on <table> either - HTMLAttributes are dropped on that path.
+   Cells are position:relative because the selection overlay
+   (.selectedCell::after) and the drag handle (.column-resize-handle) are
+   absolutely positioned inside them - without it the handle climbs to the
+   next positioned ancestor, .doc-editor, and spans the whole editor. */
+.doc-editor-content .tableWrapper {
+  overflow-x: auto;
+  max-width: 100%;
+  margin: 14px 0;
+  clear: both;
+}
+.doc-editor-content table {
+  border-collapse: collapse;
+  width: 100%;
+  table-layout: fixed;
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.2;
+}
+.doc-editor-content table th,
+.doc-editor-content table td {
+  position: relative;
+  border: 1px solid #3c3f47;
+  padding: 6px 10px;
+  vertical-align: top;
+  text-align: left;
+  min-width: 1em;
+  box-sizing: border-box;
+}
+.doc-editor-content table th {
+  font-weight: 700;
+  color: #fff;
+  background: #22252b;      /* one step off the #1a1b1e page */
+}
+/* TipTap puts a <p> in every cell — the body 6px paragraph gap would pad
+   every row's bottom edge. */
+.doc-editor-content table th > p,
+.doc-editor-content table td > p {
+  margin: 0;
+}
+.doc-editor-content table p + p { margin-top: 6px; }
+/* Cell selection (drag across cells / Shift+arrows) — accent tint overlay */
+.doc-editor-content table .selectedCell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(232, 152, 90, 0.18);
+  pointer-events: none;
+  z-index: 2;
+}
+/* Column drag handle — TipTap shows it on the cell's right edge while hovering */
+.doc-editor-content .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: -2px;
+  width: 4px;
+  background: #E8985A;
+  pointer-events: none;
+  z-index: 3;
+}
+.doc-editor-content .resize-cursor,
+.doc-editor-content .resize-cursor * { cursor: col-resize; }
+
 /* ── Video (custom NodeView) — same shape as the image wrap, swap <img> for
    <video controls>. Two side-by-side videos via two .doc-vid-align-left. */
 .doc-editor-content .doc-vid-wrap {

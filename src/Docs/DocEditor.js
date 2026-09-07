@@ -8,6 +8,8 @@ import Link from '@tiptap/extension-link';
 // TextStyle + FontSize are named exports in v3+ of this package, and
 // FontSize ships as a first-class extension — no need to roll our own.
 import { TextStyle, FontSize } from '@tiptap/extension-text-style';
+import { Table, TableRow, TableHeader, TableCell } from '@tiptap/extension-table';
+import { marked } from 'marked';
 import DocContextMenu from './DocContextMenu';
 import DocLightbox from './DocLightbox';
 import ImageNodeView from './ImageNodeView';
@@ -176,6 +178,55 @@ const Indent = Extension.create({
 });
 
 /**
+ * Structural sniff for pasted plain text. True only when the text has
+ * unmistakable markdown SHAPE: a heading line with content under it, a GFM
+ * table (a pipe row followed by its |---| separator), a fenced code block, a
+ * list marker opening two or more lines, a free-standing **bold** run, or a
+ * horizontal rule. Everything else - a sentence, a bare URL, "30-40x",
+ * "$62.50/hr", "# of players: 4", "2**8**2" - returns false so it keeps going
+ * through the default paste path (and Link's linkOnPaste for URLs).
+ */
+// A heading is a title over something: the line must be followed by more
+// content. A lone "# of players: 4" is a sentence, not an H1.
+const MD_HEADING = /^ {0,3}#{1,6} \S[^\n]*\n[\s\S]*\S/m;
+// Header row containing a pipe, then a separator row that also contains a pipe
+// and is made only of |, -, : and whitespace (|---|:--:|, --- | ---, |---|).
+const MD_TABLE = /^[^\n]*\|[^\n]*\n(?=[^\n]*\|)[ \t]*\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/m;
+const MD_FENCE = /^ {0,3}(?:```|~~~)/m;
+const MD_LIST_LINE = /^ {0,3}(?:[-*+]|\d{1,9}[.)]) \S/gm;
+// The ** pair has to stand clear of the surrounding word: "the **Warden**" is
+// bold, "2**8**2" is arithmetic (marked would bold the 8).
+const MD_BOLD = /(?:^|[^\w*])\*\*[^*\s](?:[^*\n]*[^*\s])?\*\*(?![\w*])/;
+// A rule only counts at the start or after a blank line. Directly under a line
+// of text "---" is a setext underline, which turns a plain note's divider into
+// an H2 - too ambiguous to rewrite.
+const MD_RULE = /(?:^|\n[ \t]*\n) {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*(?:\n|$)/;
+
+function looksLikeMarkdown(text) {
+  if (!text) return false;
+  const src = text.replace(/\r\n?/g, '\n');
+  if (MD_HEADING.test(src) || MD_TABLE.test(src) || MD_FENCE.test(src)) return true;
+  if (MD_BOLD.test(src) || MD_RULE.test(src)) return true;
+  // A lone "- item" is too ambiguous to rewrite; two list lines is a list.
+  const listLines = src.match(MD_LIST_LINE);
+  return !!listLines && listLines.length >= 2;
+}
+
+// True while a converted paste is being re-fed through ProseMirror, so the
+// handler below does not convert the same paste twice.
+let pastingMarkdown = false;
+
+// A GFM table has to open with a header row, so a header-less table is written
+// with a blank one (`| | |` over `|---|---|`). marked keeps it as a real
+// <thead> of empty <th>s, which would land in the doc as an empty first row.
+const MD_EMPTY_THEAD = /<thead>\s*<tr>\s*(?:<th[^>]*>\s*<\/th>\s*)+<\/tr>\s*<\/thead>/g;
+
+function markdownToHtml(text) {
+  return marked.parse(text, { gfm: true, breaks: false, async: false })
+    .replace(MD_EMPTY_THEAD, '');
+}
+
+/**
  * TipTap-backed rich text editor.
  *
  * Formatting is surfaced via right-click context menu on a selection, not
@@ -241,6 +292,14 @@ export default function DocEditor({ content, onChange, onImageUpload, onVideoUpl
       TextStyle,
       FontSize,
       Indent,
+      // resizable: the column widths are the only part of a table worth dragging,
+      // and without it a wide table just squashes every column equally. It also
+      // swaps in prosemirror-tables' own node view, which ignores HTMLAttributes,
+      // so the table has no class - Docs.css reaches it via `.tableWrapper table`.
+      Table.configure({ resizable: true }),
+      TableRow,
+      TableHeader,
+      TableCell,
     ],
     editorProps: {
       // Disable the browser's native spellcheck. Its dictionary is too narrow
@@ -248,7 +307,35 @@ export default function DocEditor({ content, onChange, onImageUpload, onVideoUpl
       // wavy red underlines were distracting more than they helped.
       attributes: { spellcheck: 'false' },
       handlePaste: (view, event) => {
-        const items = event.clipboardData && event.clipboardData.items;
+        const data = event.clipboardData;
+
+        // Markdown arrives as PLAIN TEXT with no text/html alongside it - that is
+        // what separates "pasted from a markdown file" from "copied out of a web
+        // page", which already carries its own HTML and must be left alone.
+        // Without this a pasted document lands as one grey block of #s and pipes.
+        if (!pastingMarkdown && data && !data.getData('text/html')) {
+          const text = data.getData('text/plain') || '';
+          // Shift+V asks for the text as typed, and a code block only ever holds
+          // text as typed - both keep the default path, exactly as ProseMirror
+          // decides `plain` for its own paste.
+          const literal = (view.input.shiftKey && view.input.lastKeyCode !== 45)
+            || view.state.selection.$from.parent.type.spec.code;
+          if (!literal && looksLikeMarkdown(text)) {
+            event.preventDefault();
+            // marked -> HTML string -> ProseMirror's own HTML paste. That path
+            // parses in a detached document (nothing in the HTML can run),
+            // closes the slice at table cells so a mid-paragraph paste does not
+            // swallow the rest of the line, and lets the table plugin merge a
+            // table pasted into a table. Unknown wrappers such as the
+            // thead/tbody marked puts around GFM tables are transparent to it.
+            const html = markdownToHtml(text);
+            pastingMarkdown = true;
+            try { view.pasteHTML(html, event); } finally { pastingMarkdown = false; }
+            return true;
+          }
+        }
+
+        const items = data && data.items;
         if (!items) return false;
         for (let i = 0; i < items.length; i++) {
           const item = items[i];
