@@ -8,6 +8,20 @@ import React, { useEffect, useRef } from 'react';
  * Designed to replace the persistent toolbar — keeps the writing area clean
  * and only surfaces formatting commands when they're actually wanted.
  */
+
+// Text colours. Hexes are lowercase because the active-swatch check compares
+// against the stored mark lowercased. Picked to read on the #1a1b1e page: the
+// site accent, then one clear hue per family, then a muted grey for de-emphasis.
+const COLORS = [
+  { name: 'Orange', hex: '#e8985a' },
+  { name: 'Red',    hex: '#e5484d' },
+  { name: 'Yellow', hex: '#f5d90a' },
+  { name: 'Green',  hex: '#46a758' },
+  { name: 'Blue',   hex: '#3e9bff' },
+  { name: 'Purple', hex: '#b36cff' },
+  { name: 'Grey',   hex: '#8b8f98' },
+];
+
 export default function DocContextMenu({ editor, x, y, onClose }) {
   const rootRef = useRef(null);
 
@@ -29,7 +43,7 @@ export default function DocContextMenu({ editor, x, y, onClose }) {
 
   // Clamp position to viewport so the menu never falls off-screen.
   const MENU_W = 220;
-  const MENU_H = 380; // generous estimate
+  const MENU_H = 430; // generous estimate, includes the colour row
   const margin = 8;
   const vw = window.innerWidth;
   const vh = window.innerHeight;
@@ -70,6 +84,9 @@ export default function DocContextMenu({ editor, x, y, onClose }) {
   const isQuote = editor.isActive('blockquote');
   const isLink = editor.isActive('link');
   const curFontSize = editor.getAttributes('textStyle').fontSize || null;
+  // Normalised to lowercase so a swatch reads as active whether the mark was set
+  // from here or pasted in as "#E8985A".
+  const curColor = (editor.getAttributes('textStyle').color || '').toLowerCase() || null;
 
   return (
     <div
@@ -115,6 +132,22 @@ export default function DocContextMenu({ editor, x, y, onClose }) {
         onClick={() => run(() => editor.chain().focus().setFontSize('20px').run())}>Large</Item>
       <Item active={curFontSize === '24px'}
         onClick={() => run(() => editor.chain().focus().setFontSize('24px').run())}>Extra Large</Item>
+
+      <Sep />
+      <SectionTitle>Colour</SectionTitle>
+      <div className="doc-ctx-swatch-row">
+        <button type="button"
+          className={`doc-ctx-swatch doc-ctx-swatch-none${!curColor ? ' active' : ''}`}
+          title="Default"
+          onClick={() => run(() => editor.chain().focus().unsetColor().run())} />
+        {COLORS.map(({ name, hex }) => (
+          <button key={hex} type="button"
+            className={`doc-ctx-swatch${curColor === hex ? ' active' : ''}`}
+            style={{ background: hex }}
+            title={name}
+            onClick={() => run(() => editor.chain().focus().setColor(hex).run())} />
+        ))}
+      </div>
 
       <Sep />
       <Item active={isLink}

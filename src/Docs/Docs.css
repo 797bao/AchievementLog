@@ -274,6 +274,29 @@
   display: inline-flex; align-items: center; justify-content: center;
 }
 .doc-ctx-inline:hover { color: #e8eaed; border-color: #5f6368; }
+
+/* Colour swatches — one row of dots; the active one wears the accent ring.
+   The "none" swatch is the page colour with a diagonal slash, so "no colour"
+   reads as a choice rather than an empty slot. */
+.doc-ctx-swatch-row {
+  display: flex;
+  gap: 6px;
+  padding: 4px 10px 6px;
+}
+.doc-ctx-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 0;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.doc-ctx-swatch:hover { transform: scale(1.15); }
+.doc-ctx-swatch.active { box-shadow: 0 0 0 2px #1a1b1e, 0 0 0 3.5px #E8985A; }
+.doc-ctx-swatch-none {
+  background: linear-gradient(135deg, transparent 45%, #e5484d 45%, #e5484d 55%, transparent 55%), #1a1b1e;
+}
 .doc-ctx-inline.active {
   background: rgba(232, 152, 90, 0.15);
   color: #E8985A;

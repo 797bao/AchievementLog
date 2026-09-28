@@ -7,7 +7,7 @@ import Image from '@tiptap/extension-image';
 import Link from '@tiptap/extension-link';
 // TextStyle + FontSize are named exports in v3+ of this package, and
 // FontSize ships as a first-class extension — no need to roll our own.
-import { TextStyle, FontSize } from '@tiptap/extension-text-style';
+import { TextStyle, FontSize, Color } from '@tiptap/extension-text-style';
 import { Table, TableRow, TableHeader, TableCell } from '@tiptap/extension-table';
 import { marked } from 'marked';
 import DocContextMenu from './DocContextMenu';
@@ -291,6 +291,9 @@ export default function DocEditor({ content, onChange, onImageUpload, onVideoUpl
       }),
       TextStyle,
       FontSize,
+      // Text colour rides the same textStyle mark as font size, so a coloured
+      // run is still one span - no nesting, and unsetColor leaves the size alone.
+      Color,
       Indent,
       // resizable: the column widths are the only part of a table worth dragging,
       // and without it a wide table just squashes every column equally. It also
