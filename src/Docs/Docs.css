@@ -216,6 +216,10 @@
   padding: 6px;
   font-size: 13px;
   user-select: none;
+  /* Never taller than the window: if a small screen cannot fit the whole menu,
+     it scrolls inside itself instead of losing the bottom rows. */
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
 }
 .doc-ctx-section {
   font-size: 10px;
@@ -721,6 +725,9 @@
   transition: color 0.12s, border-color 0.12s;
 }
 .docs-toc-item:hover { color: #e8eaed; border-left-color: #3c3f47; }
+/* The section the reader is in. Listed after the h1 rule's colour by
+   specificity (two classes beat one) so a current h1 goes orange too. */
+.docs-toc-item.active { color: #E8985A; border-left-color: #E8985A; }
 .docs-toc-h1 {
   font-weight: 700;
   font-size: 14px;          /* visibly larger than h2/h3 so the hierarchy reads */

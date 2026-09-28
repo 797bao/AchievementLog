@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 /**
  * Floating context menu shown on right-click when text is selected in the
@@ -38,6 +38,23 @@ export default function DocContextMenu({ editor, x, y, onClose }) {
       document.removeEventListener('keydown', onKey);
     };
   }, [onClose]);
+
+  // The menu is taller than any estimate once the colour row is in, and a guess
+  // clamped it off the bottom of the screen - the Colour section was only
+  // reachable with the cursor at the very top. Measure the real box after it
+  // mounts and re-clamp before paint; the estimate below only covers the first
+  // frame.
+  const [pos, setPos] = useState(null);
+  useLayoutEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const m = 8;
+    setPos({
+      left: Math.max(m, Math.min(x, window.innerWidth - r.width - m)),
+      top: Math.max(m, Math.min(y, window.innerHeight - r.height - m)),
+    });
+  }, [x, y]);
 
   if (!editor) return null;
 
@@ -92,7 +109,7 @@ export default function DocContextMenu({ editor, x, y, onClose }) {
     <div
       ref={rootRef}
       className="doc-context-menu"
-      style={{ left, top, width: MENU_W }}
+      style={{ left: pos ? pos.left : left, top: pos ? pos.top : top, width: MENU_W }}
       onContextMenu={(e) => e.preventDefault()}
     >
       <SectionTitle>Format</SectionTitle>
